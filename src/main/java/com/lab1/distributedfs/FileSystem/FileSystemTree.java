@@ -1,5 +1,7 @@
 package com.lab1.distributedfs.FileSystem;
 
+import com.lab1.distributedfs.CONST;
+
 import java.io.*;
 import java.util.*;
 
@@ -24,11 +26,21 @@ public class FileSystemTree implements Serializable {
 
     // Method to add a file to a given path
     public void touch(String path, String fileName, long fileSize, List<BlockNode> blockList, boolean recursive) {
+        // Add the file to the final directory node
+        FileNode fileNode = new FileNode(path, fileName, fileSize, blockList);
+        this.touch(path, fileNode, recursive);
+    }
+
+    public void touch(String path, FileNode fileNode) {
+        this.touch(path, fileNode, true);
+    }
+
+    public void touch(String path, FileNode fileNode, boolean recursive) {
         String[] dirs = path.trim().split("/");
         // Remove any empty strings from the array
         dirs = Arrays.stream(dirs)
-            .filter(dir -> !dir.isEmpty())
-            .toArray(String[]::new);
+                .filter(dir -> !dir.isEmpty())
+                .toArray(String[]::new);
 
         DirectoryNode currentDir = root;
         // Traverse through the directories in the path
@@ -42,9 +54,7 @@ public class FileSystemTree implements Serializable {
             currentDir = currentDir.getSubDirectory(dir);
         }
 
-        // Add the file to the final directory node
-        FileNode fileNode = new FileNode(fileName, fileSize, blockList);
-        currentDir.addFile(fileName, fileNode);
+        currentDir.addFile(fileNode.getFilename(), fileNode);
     }
 
     public void rm(String pathname) {
@@ -115,7 +125,6 @@ public class FileSystemTree implements Serializable {
         }
     }
 
-
     // ================================================ SEARCH =========================================================
 
     public FileNode findFile(String fileName) {
@@ -173,8 +182,8 @@ public class FileSystemTree implements Serializable {
     // ================================================ OUTPUT =========================================================
 
     // Method to display the file system structure
-    public void displayFileSystem() {
-        root.displayStructure("");
+    public String displayFileSystem() {
+        return root.displayStructure("");
     }
 
     // ================================================ PERSIST ========================================================
@@ -193,55 +202,27 @@ public class FileSystemTree implements Serializable {
         }
     }
 
-    private void saveDirectoryToFile(DirectoryNode dir, BufferedWriter writer, String pathPrefix, int depth) throws IOException {
-        String dirPath = pathPrefix + dir.getDirectoryName();
-        // Add indentation (tabs) based on the depth level
-        String indent = "\t".repeat(depth);
+    // Method to read the file and split it into chunks of 4KB
+    public static List<byte[]> splitFileIntoChunks(String filePath) throws IOException {
+        List<byte[]> chunks = new ArrayList<>();
+        File file = new File(filePath);
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] buffer = new byte[CONST.BLOCK_SIZE];
+            int bytesRead;
 
-        // Write directory information with tabbed indentation
-        writer.write(indent + "DIR|" + (pathPrefix.isEmpty() ? "root" : pathPrefix) + "|" + dir.getDirectoryName());
-        writer.newLine();
-
-        // Write file information with tabbed indentation
-        for (FileNode file : dir.getFiles()) {
-            writer.write(indent + "\t" + "FILE|" + dirPath + "|" + file.getFilename() + "|" + file.getFileSize() + "|" + file.getBlockList().size());
-            for (BlockNode block : file.getBlockList()) {
-                // For each block, print the blockID and its replicas (data nodes)
-                writer.write("|" + block.getBlockID() + ":" + block.getFilename() + "[");
-                List<Integer> replicas = block.getReplicas();
-                for (int i = 0; i < replicas.size(); i++) {
-                    writer.write(replicas.get(i).toString());
-                    if (i < replicas.size() - 1) {
-                        writer.write(", ");
-                    }
+            // Read the file in 4KB chunks
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                if (bytesRead < CONST.BLOCK_SIZE) {
+                    // If bytesRead is less than CHUNK_SIZE, resize the buffer to the actual bytes read
+                    byte[] chunk = new byte[bytesRead];
+                    System.arraycopy(buffer, 0, chunk, 0, bytesRead);
+                    chunks.add(chunk);
+                } else {
+                    // Full 4KB chunk
+                    chunks.add(buffer.clone());
                 }
-                writer.write("]");
             }
-            writer.newLine();
         }
-
-        // Recurse into subdirectories with increased indentation
-        for (DirectoryNode subDir : dir.getSubDirectories()) {
-            saveDirectoryToFile(subDir, writer, dirPath + "/", depth + 1);
-        }
-    }
-
-    // Save the entire file system to a text file
-    public void saveToTextFile(String filename) throws IOException {
-        BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
-        saveDirectoryToFile(root, writer, "", 0);
-        writer.close();
-    }
-
-    public String getFileSystemAsString() throws IOException {
-        StringWriter stringWriter = new StringWriter();
-        BufferedWriter writer = new BufferedWriter(stringWriter);
-        saveDirectoryToFile(root, writer, "", 0);
-        writer.flush();  // Ensure all content is written to the StringWriter
-        return stringWriter.toString();
-    }
-
-    public void printFileSystem() throws IOException {
-        System.out.println(getFileSystemAsString());
+        return chunks;
     }
 }

@@ -2,19 +2,19 @@ package com.lab1.distributedfs.ShellCommand;
 
 import java.util.List;
 
-public class WriteCommand extends Command {
+public class WriteFile extends Command {
     @Override
     public String getDescription() {
-        return "write: Writes data from command argument to a \"virtual\" file.";
+        return "write_file: Writes data from a external file to the a \"virtual\" file.";
     }
 
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: write <data> <pathname>?
-                    String data defined in <data> will be appended to the most
+                    Usage: write_file <data_path> <pathname>?
+                    Data read from the data file will be appended to the most
                     recently opened file or file specified by the pathname.
-                    <data> - Any string of data.
+                    <data_path> - Path to the data file to we want to write (or append).
                     <pathname> - Pathname to the file to write (or append).""";
     }
 

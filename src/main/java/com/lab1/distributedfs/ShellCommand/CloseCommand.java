@@ -1,6 +1,12 @@
 package com.lab1.distributedfs.ShellCommand;
 
+import com.lab1.distributedfs.Message.Message;
+import com.lab1.distributedfs.Message.RequestType;
+import com.lab1.distributedfs.Message.ResponseType;
+
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.concurrent.TimeUnit;
 
 public class CloseCommand extends Command {
 
@@ -12,8 +18,10 @@ public class CloseCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                Usage: close
-                Closes the currently opened file and releases the R/W lock.""";
+                    Usage: close
+                    Closes the currently opened file and releases the R/W lock,
+                    if multiple files are opened, it releases the most recently opened.
+                    <pathname> - (Optional) Pathname of the file to close.""";
     }
 
     @Override
@@ -23,13 +31,30 @@ public class CloseCommand extends Command {
             return true;
         }
 
-        if (!commandArgs.isEmpty()) {
-            System.out.println("Error: close does not accept any arguments.");
+        if (commandArgs.size() > 1) {
+            System.out.println("Error: close accepts one or no argument.");
             return true;
         }
 
-        // Implement file-closing logic here
-        System.out.println("Closing the file...");
+        String path = "";
+        try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
+
+        try {
+            requestQueue.put(
+                new Message<>(RequestType.CLOSE, path)
+            );
+            Message<?> closeReply = waitForResponse();
+            assert closeReply != null;
+
+            if (closeReply.getResponseType() == ResponseType.CLOSE) {
+                System.out.println("Closed file \"" + closeReply.getData() + "\"");
+            } else {
+                System.out.println("Error: " + closeReply.getData());
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         return true;
     }
 }

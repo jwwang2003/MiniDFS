@@ -1,4 +1,4 @@
-package com.lab1.distributedfs.BlockIOOP;
+package com.lab1.distributedfs.IO.DataNodeIO;
 
 import com.lab1.distributedfs.Node.DataNode;
 

@@ -1,17 +1,19 @@
-package com.lab1.distributedfs.BlockIOOP;
+package com.lab1.distributedfs.IO.DataNodeIO;
 
-import com.lab1.distributedfs.Constants;
+import com.lab1.distributedfs.CONST;
 import com.lab1.distributedfs.Node.DataNode;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Block {
+    // Basic attributes
     private final int replica;
     private final String filename;
     private final int blockID;
+
     // Regex expression for the naming pattern of blocks within a DataNode
-    public static final Pattern pattern = Pattern.compile("replica(\\d+)_([^_]+)_block(\\d+)" + Constants.BLOCK_FILETYPE);
+    public static final Pattern pattern = Pattern.compile("replica(\\d+)_([^_]+)_block(\\d+)" + CONST.BLOCK_FILETYPE);
 
     // Constructor that takes replica, filename, and blockID
     public Block(int replica, String filename, int blockID) {
@@ -30,7 +32,7 @@ public class Block {
     }
 
     public String getFileName() {
-        return DataNode.getBlockName(this.replica, this.filename, this.blockID) + Constants.BLOCK_FILETYPE;
+        return DataNode.getBlockName(this.replica, this.filename, this.blockID) + CONST.BLOCK_FILETYPE;
     }
 
     public int getReplica() {

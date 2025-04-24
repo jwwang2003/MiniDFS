@@ -1,30 +1,49 @@
 package com.lab1.distributedfs;
 
-import com.lab1.distributedfs.ShellCommand.OpenCommand;
-import com.lab1.distributedfs.ShellCommand.CloseCommand;
-import com.lab1.distributedfs.ShellCommand.ReadCommand;
-import com.lab1.distributedfs.ShellCommand.WriteCommand;
-import com.lab1.distributedfs.ShellCommand.Command;
+import com.lab1.distributedfs.Message.Message;
+import com.lab1.distributedfs.Message.RequestType;
+import com.lab1.distributedfs.Node.Client;
+import com.lab1.distributedfs.ShellCommand.*;
 import com.lab1.distributedfs.ShellParser.ParseException;
 import com.lab1.distributedfs.ShellParser.ShellParser;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Shell {
-    private final Scanner scanner;
-    private final Map<String, Command> commands;
+    final Scanner scanner;
+    final Map<String, Command> commands;
+
+    final BlockingQueue<Message<?>> requestQueue = new LinkedBlockingQueue<>();
+    final BlockingQueue<Message<?>> responseQueue = new LinkedBlockingQueue<>();
+    final ExecutorService executorService = Executors.newFixedThreadPool(1);
 
     public Shell(Scanner scanner) {
+        // Initialize the client thread
+        Command.client = new Client(requestQueue, responseQueue);
+        Command.requestQueue = this.requestQueue;
+        Command.responseQueue = this.responseQueue;
+        Command.executorService = this.executorService;
+
+        this.executorService.execute(Command.client);
+
+        // Initialize scanner
         this.scanner = scanner;
+
+        // Commands
         this.commands = new LinkedHashMap<>();
 
         // Register commands
         this.commands.put("help", new HelpCommand());
+        this.commands.put("quit", new QuitCommand());
+
+        this.commands.put("lsfs", new LSFSCommand());
         this.commands.put("open", new OpenCommand());
         this.commands.put("close", new CloseCommand());
         this.commands.put("write", new WriteCommand());
+        this.commands.put("write_file", new WriteFile());
         this.commands.put("read", new ReadCommand());
-        this.commands.put("quit", new QuitCommand());
+        this.commands.put("delete", new DeleteCommand());
     }
 
     public void printWelcome() {
@@ -43,6 +62,7 @@ public class Shell {
         // Try parsing the input and display the result
         try {
             List<String> parsedResult = ShellParser.parseString(input);
+
             return this.handleShellInput(parsedResult);
         } catch (ParseException e) {
             System.out.println("Error parsing input: " + e.getMessage());
@@ -68,17 +88,7 @@ public class Shell {
         }
     }
 
-    public class HelpCommand extends Command {
-        @Override
-        public String getDescription() {
-            return "";
-        }
-
-        @Override
-        public String getHelpMessage() {
-            return "";
-        }
-
+    private class HelpCommand extends Command {
         @Override
         public boolean handle(List<String> commandArgs) {
             System.out.println("Available commands:");
@@ -90,22 +100,15 @@ public class Shell {
         }
     }
 
-    public class QuitCommand extends Command {
+    private static class QuitCommand extends Command {
         @Override
         public String getDescription() {
             return "quit: Quit the shell";
         }
 
         @Override
-        public String getHelpMessage() {
-            return "";
-        }
-
-        @Override
         public boolean handle(List<String> commandArgs) {
-            System.out.println("Attempting to shutdown...");
-            client.shutdown();
-            System.exit(0);
+            shutdown();
             return false;
         }
     }

@@ -1,19 +1,15 @@
 package com.lab1.distributedfs.Node;
 
-import com.lab1.distributedfs.BlockIOOP.*;
-import com.lab1.distributedfs.Constants;
-import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.MessageType;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.IO.DataNodeIO.*;
+import com.lab1.distributedfs.Message.*;
+import com.lab1.distributedfs.Message.MessageBroker;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.nio.file.Paths;
 import java.nio.file.Path;
 
@@ -23,7 +19,7 @@ Simulating the concept of a "distributed file system", but in this case, the vir
 we are implementing is not distributed between multiple disks/servers, but just between different files.
 
 Features:
-- Supported operations
+- Supported operations (all tested)
     - Write
     - Read
     - Delete
@@ -31,16 +27,11 @@ Features:
 - Exit (stop current thread)
  */
 
-public class DataNode implements Runnable {
-    private final BlockingQueue<Message<?>> messageQueue;
-    private final BlockingQueue<Message<?>> responseQueue;
-    private final int nodeID;
+public class DataNode extends Node {
     private File storageDir;
 
-    public DataNode(BlockingQueue<Message<?>> messageQueue, BlockingQueue<Message<?>> responseQueue, int nodeID) {
-        this.messageQueue = messageQueue;
-        this.responseQueue = responseQueue;
-        this.nodeID = nodeID;
+    public DataNode(int nodeID, MessageBroker messageBroker) {
+        super(nodeID, messageBroker);
     }
 
     @Override
@@ -48,30 +39,22 @@ public class DataNode implements Runnable {
         // Create directory to store blocks if it doesn't exist
         // node#/...
         String nodeDir = String.format("node%s", nodeID);
-        String path = Paths.get(Constants.DATANODE_ROOT_DIR, nodeDir).toString();
+        String path = Paths.get(CONST.getPath(CONST.DATANODE_ROOT_DIR), nodeDir).toString();
         this.storageDir = new File(path);
         if (!storageDir.exists()) {
-            boolean res = storageDir.mkdirs();
+            storageDir.mkdirs();
         }
 
-        try {
-            while (true) {
-                // Polling is used to detect timeouts
-                Message<?> message = messageQueue.poll(Constants.WORKER_TIMEOUT, TimeUnit.MILLISECONDS);
-                if (message != null) {
+        this.messageBroker.subscribe(this.nodeID, message -> {
+            // Handle message
+            if (message != null) {
+                try {
                     this.handleMessage(message);
-                } else {
-                    // Theoretically, the main thread (name server) should be sending a heartbeat request every second.
-                    // Therefore, if the worker thread did not receive anything for more than that, there is a problem.
-                    // Handle timeout situation (e.g., main thread crashed or delayed)
-
-                    System.out.printf("DataNode %s detected timeout from main thread (NameNode)", this.nodeID);
-                    break;  // Optionally exit the loop or restart worker thread
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        });
     }
 
     public int getNodeID() {
@@ -83,7 +66,8 @@ public class DataNode implements Runnable {
         if (message.getMessageType() != MessageType.Request) {
             // DataNoes are "worker threads", they only accept request messages.
             // Therefore, if the message is NOT a request, then something must have gone horribly wrong.
-            throw new RuntimeException("Invalid message type: " + message.getMessageType());
+//            throw new RuntimeException("Invalid message type: " + message.getMessageType());
+            return;
         }
 
         // Determine the request type
@@ -93,13 +77,10 @@ public class DataNode implements Runnable {
             case RequestType.DELETE -> handleDeleteRequest(message);
             case RequestType.HEARTBEAT -> handleHeartbeat();
             case RequestType.EXIT -> handleExit();
-            default -> {
-                throw new RuntimeException("Invalid request type: " + message.getRequestType());
-            }
         }
     }
 
-    private void handleReadRequest(Message<?> message) throws InterruptedException {
+    private void handleReadRequest(Message<?> message) {
         if (message.getData() instanceof ReadRequest readRequest) {
             // Construct the path to the requested block file
             String blockFileName = readRequest.getFilename();
@@ -110,7 +91,10 @@ public class DataNode implements Runnable {
             if (!file.exists()) {
                 // If the file doesn't exist, respond with failure
                 String errorMessage = String.format("Error: file not found (node%s, %s)", nodeID, blockFileName);
-                this.responseQueue.put(new Message<>(ResponseType.NOTFOUND, errorMessage));
+                this.messageBroker.sendToSubscriber(
+                    0,
+                    new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
+                );
                 return;
             }
 
@@ -118,41 +102,42 @@ public class DataNode implements Runnable {
                 // Read the file data into a byte array
                 byte[] fileData = java.nio.file.Files.readAllBytes(path);
                 // Send the data back via the response queue
-                this.responseQueue.put(
-                    new Message<>(ResponseType.SUCCESS, new ReadResponse(readRequest, fileData))
+                this.messageBroker.broadcast(
+                        new Message<>(this.getNodeID(), ResponseType.READ, new ReadResponse(readRequest, fileData))
                 );
             } catch (IOException e) {
                 String errorMessage = String.format(
                     "Error: while reading block (node%s, %s): %s%n\n",
-                    nodeID,
+                    this.getNodeID(),
                     readRequest.getFilename(),
                     e.getMessage()
                 );
-                this.responseQueue.put(
-                    new Message<>(
-                        ResponseType.FAIL, errorMessage + Arrays.toString(e.getStackTrace())
+                this.messageBroker.broadcast(
+                        new Message<>(this.getNodeID(), ResponseType.FAIL, errorMessage + Arrays.toString(e.getStackTrace())
                     )
                 );
             }
         } else {
             // If the data is not of the expected type, handle it gracefully
             String errorMessage = String.format("Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.responseQueue.put(
-                new Message<>(
-                    ResponseType.FAIL, errorMessage
-                )
+            this.messageBroker.broadcast(
+                new Message<>(this.getNodeID(), ResponseType.FAIL, errorMessage)
             );
         }
     }
 
-    private void handleWriteRequest(Message<?> message) throws InterruptedException {
+    private void handleWriteRequest(Message<?> message) {
         if (message.getData() instanceof WriteRequest writeRequest) {
             byte[] dataBytes = writeRequest.getData();  // Convert the incoming data to byte array
-            int totalBlocks = (int) Math.ceil((double) dataBytes.length / Constants.BLOCK_SIZE);
+            int totalBlocks = (int) Math.ceil((double) dataBytes.length / CONST.BLOCK_SIZE);
 
             if (totalBlocks == 0) {
-                this.responseQueue.put(
-                    new Message<>(ResponseType.SUCCESS, new WriteResponse(writeRequest, dataBytes.length))
+                this.messageBroker.sendToSubscriber(0,
+                        new Message<>(
+                            this.getNodeID(),
+                            ResponseType.WRITE,
+                            new WriteResponse(writeRequest, dataBytes.length)
+                        )
                 );
                 return;
             }
@@ -163,9 +148,9 @@ public class DataNode implements Runnable {
                     writeRequest.getFileName(),
                     "dataframe exceeded unit block size"
                 );
-                this.responseQueue.put(
+                this.messageBroker.broadcast(
                     new Message<>(
-                        ResponseType.FAIL, errorMessage
+                        this.getNodeID(), ResponseType.FAIL, errorMessage
                     )
                 );
                 return;
@@ -175,8 +160,8 @@ public class DataNode implements Runnable {
                 String blockFileName = writeRequest.getFileName();
                 Path path = Paths.get(storageDir.getPath(), blockFileName);
                 this.persistBlock(path, dataBytes);
-                this.responseQueue.put(
-                    new Message<>(ResponseType.SUCCESS, new WriteResponse(writeRequest, dataBytes.length))
+                this.messageBroker.broadcast(
+                    new Message<>(this.getNodeID(), ResponseType.WRITE, new WriteResponse(writeRequest, dataBytes.length))
                 );
             } catch (IOException e) {
                 String errorMessage = String.format(
@@ -185,24 +170,24 @@ public class DataNode implements Runnable {
                     writeRequest.getFileName(),
                     e.getMessage()
                 );
-                this.responseQueue.put(
+                this.messageBroker.broadcast(
                     new Message<>(
-                        ResponseType.FAIL, errorMessage + Arrays.toString(e.getStackTrace())
+                        this.getNodeID(), ResponseType.FAIL, errorMessage + Arrays.toString(e.getStackTrace())
                     )
                 );
             }
         } else {
             // If the data is not of the expected type, handle it gracefully
             String errorMessage = String.format("Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.responseQueue.put(
+            this.messageBroker.broadcast(
                 new Message<>(
-                    ResponseType.FAIL, errorMessage
+                    this.getNodeID(), ResponseType.FAIL, errorMessage
                 )
             );
         }
     }
 
-    private void handleDeleteRequest(Message<?> message) throws InterruptedException {
+    private void handleDeleteRequest(Message<?> message) {
         if (message.getData() instanceof DeleteRequest deleteRequest) {
             // Get the filename to delete (we will delete all replicas and blocks of this file)
             String filename = deleteRequest.getFilename();
@@ -222,22 +207,26 @@ public class DataNode implements Runnable {
                     boolean deleted = file.delete();
                     if (!deleted) {
                         String errorMessage = String.format("Failed to delete file: %s%n",file.getName());
-                        this.responseQueue.put(new Message<>(ResponseType.FAIL, errorMessage));
+                        this.messageBroker.broadcast(new Message<>(this.getNodeID(), ResponseType.FAIL, errorMessage));
                         return;
                     }
                     blocksDeleted.add(block.getBlockID());
                 }
                 // Send success response
-                this.responseQueue.put(new Message<>(ResponseType.SUCCESS, new DeleteResponse(deleteRequest, blocksDeleted)));
+                this.messageBroker.sendToSubscriber(
+                    0, new Message<>(
+                        this.getNodeID(), ResponseType.WRITE, new DeleteResponse(deleteRequest, blocksDeleted)
+                    )
+                );
             } else {
                 // No files found to delete
                 String errorMessage = String.format("No files found to delete for filename: %s", filename);
-                this.responseQueue.put(new Message<>(ResponseType.NOTFOUND, errorMessage));
+                this.messageBroker.sendToSubscriber(0, new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage));
             }
         } else {
             // If the data is not of the expected type, handle it gracefully
             String errorMessage = String.format("Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.responseQueue.put(new Message<>(ResponseType.FAIL, errorMessage));
+            this.messageBroker.sendToSubscriber(0, new Message<>(this.getNodeID(), ResponseType.FAIL, errorMessage));
         }
     }
 
@@ -258,8 +247,8 @@ public class DataNode implements Runnable {
     /**
      * Sends an ACK response to the response queue, ACKing the heartbeat request from the main thread.
      */
-    private void handleHeartbeat() throws InterruptedException {
-        responseQueue.put(new Message<>(ResponseType.ACK, null));
+    private void handleHeartbeat() {
+        this.messageBroker.broadcast(new Message<>(this.getNodeID(), ResponseType.ACK, null));
     }
 
     public void handleExit() {

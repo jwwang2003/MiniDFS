@@ -16,8 +16,7 @@ import java.util.List;
 public class FileSystemTreeTest {
 
     private FileSystemTree fileSystemTree;
-    private static final String TEST_FILE_NAME = "./testFilesystem.ser";
-    private static final String TEST_TEXT_FILE = "./testFilesystem.txt";
+    private static final String TEST_FILE_NAME = "./fsimage.ser";
 
     @BeforeEach
     public void setUp() {
@@ -26,7 +25,7 @@ public class FileSystemTreeTest {
 
         // Add some random files to the tree
         List<BlockNode> blockList = new ArrayList<>();
-        blockList.add(new BlockNode(1, "", new ArrayList<>()));
+        blockList.add(new BlockNode(1, "", 128, new ArrayList<>()));
 
         // Adding files
         fileSystemTree.touch("/", "file1.txt", 1024, blockList, false);
@@ -44,7 +43,7 @@ public class FileSystemTreeTest {
     @Test
     public void testAddFile_invalidDirectory() {
         List<BlockNode> blockList = new ArrayList<>();
-        blockList.add(new BlockNode(1, "", new ArrayList<>()));
+        blockList.add(new BlockNode(1, "", 128, new ArrayList<>()));
 
         // Test: Adding a file to a non-existing directory should throw an exception
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
@@ -56,15 +55,14 @@ public class FileSystemTreeTest {
     public void testDeleteFile_validPath() {
         // Delete file 'file2.txt' located in 'root/subdir1'
         fileSystemTree.rm("/tmp/file3.txt");
-        fileSystemTree.displayFileSystem();
+        System.out.println(fileSystemTree.displayFileSystem());
     }
 
     @Test
     public void testSaveAndLoadFileSystem() throws IOException, ClassNotFoundException {
         // Save to file
         fileSystemTree.saveToFile(TEST_FILE_NAME);
-        fileSystemTree.printFileSystem();
-        fileSystemTree.displayFileSystem();
+        System.out.println(fileSystemTree.displayFileSystem());
 
         System.out.println(fileSystemTree.getFile("/tmp/file3.txt"));
         // Load the file system back from the file
@@ -77,25 +75,6 @@ public class FileSystemTreeTest {
         assertEquals(1, tmpDir.getFiles().size(), "File count in loaded root directory should be 1.");
         assertEquals("file1.txt", rootDir.getFiles().getFirst().getFilename(), "File name in loaded file system should be 'file1.txt'.");
         assertEquals("file3.txt", tmpDir.getFiles().getFirst().getFilename(), "File name in loaded file system should be 'file1.txt'.");
-    }
-
-    @Test
-    public void testSaveToTextFile() throws IOException {
-        List<BlockNode> blockList = new ArrayList<>();
-        blockList.add(new BlockNode(1, "", new ArrayList<>()));
-
-        // Adding a file
-        fileSystemTree.touch("/", "file1.txt", 1024, blockList, false);
-        // Save to text file
-        fileSystemTree.saveToTextFile(TEST_TEXT_FILE);
-
-        // Read the text file and check contents
-        try (BufferedReader reader = new BufferedReader(new FileReader(TEST_TEXT_FILE))) {
-            String line = reader.readLine();
-            assertTrue(line.contains("DIR|root|root"), "Text file should contain root directory info.");
-            line = reader.readLine();
-            assertTrue(line.contains("FILE|root|file1.txt|1024|1|1"), "Text file should contain file1.txt info.");
-        }
     }
 
     @Test
@@ -122,6 +101,5 @@ public class FileSystemTreeTest {
     public void tearDown() {
         // Clean up the files after tests
         new File(TEST_FILE_NAME).delete();
-        new File(TEST_TEXT_FILE).delete();
     }
 }

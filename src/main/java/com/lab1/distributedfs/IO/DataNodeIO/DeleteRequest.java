@@ -1,4 +1,4 @@
-package com.lab1.distributedfs.BlockIOOP;
+package com.lab1.distributedfs.IO.DataNodeIO;
 
 public class DeleteRequest extends Block {
     private final int dataNodeID;

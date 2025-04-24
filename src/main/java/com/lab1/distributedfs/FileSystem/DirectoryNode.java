@@ -49,14 +49,24 @@ public class DirectoryNode implements Serializable {
     }
 
     // Display the directory structure
-    public void displayStructure(String indent) {
-        System.out.println(indent + "Directory: " + directoryName);
+    public String displayStructure(String indent) {
+        StringBuilder sb = new StringBuilder();
+
+        // Append the directory information
+        sb.append(indent).append("Directory: ").append(directoryName).append("\n");
+
+        // Append files in the directory
         for (FileNode file : files.values()) {
-            System.out.println(indent + "  " + file);
+            sb.append(indent).append("  ").append(file).append("\n");
         }
+
+        // Recursively append subdirectories
         for (DirectoryNode subDir : subDirectories.values()) {
-            subDir.displayStructure(indent + "  ");
+            sb.append(subDir.displayStructure(indent + "  "));
         }
+
+        // Return the accumulated string
+        return sb.toString();
     }
 
     // Delete a file by its name

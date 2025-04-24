@@ -1,4 +1,4 @@
-package com.lab1.distributedfs.BlockIOOP;
+package com.lab1.distributedfs.IO.DataNodeIO;
 
 public class ReadRequest extends Block {
     private final int dataNodeID;

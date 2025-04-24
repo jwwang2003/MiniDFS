@@ -1,8 +1,15 @@
 package com.lab1.distributedfs.ShellCommand;
 
-import com.lab1.distributedfs.BlockIOOP.IOMode;
+import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.FileSystem.FileNode;
+import com.lab1.distributedfs.IO.Client.Open;
+import com.lab1.distributedfs.IO.Client.OpenMode;
+import com.lab1.distributedfs.Message.Message;
+import com.lab1.distributedfs.Message.RequestType;
+import com.lab1.distributedfs.Message.ResponseType;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class OpenCommand extends Command {
     @Override
@@ -13,9 +20,9 @@ public class OpenCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                Usage: open <filename> <mode>?
-                <filename> - Name of the file to open.
-                <mode>? - (optional) Mode to open the file in (e.g., R(read), W(write)).""";
+                    Usage: open <filename> <mode>?
+                    <filename> - Name of the file to open.
+                    <mode>? - (optional) Mode to open the file in (e.g., R(read), W(write)).""";
     }
 
     @Override
@@ -31,14 +38,45 @@ public class OpenCommand extends Command {
         }
 
         try {
-            String filename = commandArgs.get(0);
-            IOMode mode = commandArgs.size() > 1 ? IOMode.valueOf(commandArgs.get(1).toUpperCase()) : null;
-            System.out.println("Opening file: " + filename + " with mode: " + mode);
-            // Add your file-opening logic here
+            String path = commandArgs.get(0);
+            OpenMode mode = commandArgs.size() > 1 ? OpenMode.valueOf(commandArgs.get(1).toUpperCase()) : OpenMode.W;
+            try {
+                Open open = new Open(mode, path);
+                Message<?> openReply = null;
+
+                requestQueue.put(new Message<>(RequestType.FIND, path));
+                Message<?> findReply = waitForResponse();
+                assert findReply != null;
+
+                if (findReply.getResponseType() == ResponseType.FOUND && findReply.getData() instanceof FileNode fileNode) {
+                    // File found
+                    open = new Open(mode, path, fileNode);
+                }
+
+                if (findReply.getResponseType() == ResponseType.NOTFOUND && mode != OpenMode.W) {
+                    System.out.println(findReply.getData());
+                    System.out.printf("File \"%s\" does not exist! Open in write mode to create a new one\n", path);
+                    return true;
+                }
+
+                requestQueue.put(
+                    new Message<>(RequestType.OPEN, open)
+                );
+                openReply = waitForResponse();
+                assert openReply != null;
+
+                if (openReply.getResponseType() == ResponseType.OPEN) {
+                    System.out.println("Opened new file \"" + path + "\"");
+                } else {
+                    System.out.println("Error: " + openReply.getData());
+                }
+            } catch (InterruptedException | AssertionError e) {
+                throw new RuntimeException(e);
+            }
         } catch (IllegalArgumentException e) {
             System.out.println("Error: invalid <mode> value: " + e.getMessage());
         }
 
-        return true;
+    return true;
     }
 }

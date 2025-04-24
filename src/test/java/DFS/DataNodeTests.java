@@ -1,11 +1,12 @@
 package DFS;
 
-import com.lab1.distributedfs.BlockIOOP.DeleteRequest;
-import com.lab1.distributedfs.BlockIOOP.DeleteResponse;
-import com.lab1.distributedfs.BlockIOOP.WriteResponse;
+import com.lab1.distributedfs.IO.DataNodeIO.DeleteRequest;
+import com.lab1.distributedfs.IO.DataNodeIO.DeleteResponse;
+import com.lab1.distributedfs.IO.DataNodeIO.WriteResponse;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.BlockIOOP.WriteRequest;
+import com.lab1.distributedfs.IO.DataNodeIO.WriteRequest;
+import com.lab1.distributedfs.Message.MessageBroker;
 import org.junit.jupiter.api.Assertions;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ public class DataNodeTests {
         // Mocking file directory and file operations
         mockStorageDir = mock(File.class);
 
-        dataNode = new DataNode(requestQueue, responseQueue, 0);
+        dataNode = new DataNode(0, new MessageBroker(6));
         executorService = Executors.newFixedThreadPool(1);
         new Thread(dataNode).start();
     }
@@ -59,7 +60,9 @@ public class DataNodeTests {
 //        System.out.println(data.length);
 
         // When
-        requestQueue.put(new Message<>(RequestType.WRITE, new WriteRequest(0, TEST_FILENAME, TEST_BLOCK_ID, data)));
+        requestQueue.put(
+            new Message<>(0, RequestType.WRITE, new WriteRequest(0, TEST_FILENAME, TEST_BLOCK_ID, data))
+        );
 
         // Then
         Message<?> response = responseQueue.take();
@@ -68,7 +71,7 @@ public class DataNodeTests {
         }
 
         // When
-        requestQueue.put(new Message<>(RequestType.DELETE, new DeleteRequest(0, TEST_FILENAME)));
+        requestQueue.put(new Message<>(0, RequestType.DELETE, new DeleteRequest(0, TEST_FILENAME)));
 
         response = responseQueue.take();
         if (response.getData() instanceof DeleteResponse deleteResponse) {
