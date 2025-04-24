@@ -1,7 +1,6 @@
 package com.lab1.distributedfs;
 
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
 import com.lab1.distributedfs.Node.Client;
 import com.lab1.distributedfs.ShellCommand.*;
 import com.lab1.distributedfs.ShellParser.ParseException;
@@ -41,7 +40,7 @@ public class Shell {
         this.commands.put("open", new OpenCommand());
         this.commands.put("close", new CloseCommand());
         this.commands.put("write", new WriteCommand());
-        this.commands.put("write_file", new WriteFile());
+        this.commands.put("write_file", new WriteFileCommand());
         this.commands.put("read", new ReadCommand());
         this.commands.put("delete", new DeleteCommand());
     }

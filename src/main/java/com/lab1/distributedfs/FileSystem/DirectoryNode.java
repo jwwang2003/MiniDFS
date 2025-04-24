@@ -74,7 +74,7 @@ public class DirectoryNode implements Serializable {
         if (files.containsKey(fileName)) {
             files.remove(fileName);
         } else {
-            throw new IllegalArgumentException("File " + fileName + " not found in directory " + directoryName);
+            throw new IllegalArgumentException("file \"" + fileName + "\" not found in directory \"" + directoryName + "\"");
         }
     }
 
@@ -86,10 +86,10 @@ public class DirectoryNode implements Serializable {
             if (subDir.getFiles().isEmpty() && subDir.getSubDirectories().isEmpty()) {
                 subDirectories.remove(dirName);
             } else {
-                throw new IllegalArgumentException("Subdirectory " + dirName + " is not empty and cannot be deleted.");
+                throw new IllegalArgumentException("subdirectory \"" + dirName + "\" is not empty and cannot be deleted.");
             }
         } else {
-            throw new IllegalArgumentException("Subdirectory " + dirName + " not found in directory " + directoryName);
+            throw new IllegalArgumentException("subdirectory \"" + dirName + "\" not found in directory \"" + directoryName + "\"");
         }
     }
 }

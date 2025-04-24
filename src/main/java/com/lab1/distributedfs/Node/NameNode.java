@@ -119,7 +119,7 @@ public class NameNode extends Node {
                     message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.FOUND, fileNode)
                 );
             } catch (IllegalArgumentException e) {
-                String errorMessage = String.format("Error: file query \"%s\" failed with %s", path, e.getMessage());
+                String errorMessage = String.format("File query \"%s\" failed with %s", path, e.getMessage());
                 this.messageBroker.sendToSubscriber(
                     message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
                 );
@@ -148,7 +148,7 @@ public class NameNode extends Node {
                     message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.DELETE, fileNode)
                 );
             } catch (IllegalArgumentException e) {
-                String errorMessage = String.format("Error: file query \"%s\" failed with %s", path, e.getMessage());
+                String errorMessage = String.format("file query \"%s\" failed with %s", path, e.getMessage());
                 this.messageBroker.sendToSubscriber(
                     message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
                 );

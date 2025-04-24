@@ -2,7 +2,7 @@ package com.lab1.distributedfs.ShellCommand;
 
 import java.util.List;
 
-public class WriteFile extends Command {
+public class WriteFileCommand extends Command {
     @Override
     public String getDescription() {
         return "write_file: Writes data from a external file to the a \"virtual\" file.";

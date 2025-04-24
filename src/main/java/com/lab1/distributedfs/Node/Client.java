@@ -115,13 +115,10 @@ public class Client implements Runnable {
                             Const.NAME_NODE_ID, message
                         );
                     case DELETE -> {
+                        // Ensure the file to delete is not busy.
                         if (busyPaths.containsKey((String) message.getData())) {
                             responseQueue.put(new Message<>(ResponseType.FAIL, "File is busy"));
-                        } else {
-                            this.messageBroker.sendToSubscriber(
-                                    Const.NAME_NODE_ID, message
-                            );
-                        }
+                        } else { this.messageBroker.sendToSubscriber(Const.NAME_NODE_ID, message); }
                     }
                     // Handle open & close commands
                     case OPEN -> this.handleOpenFile(message);

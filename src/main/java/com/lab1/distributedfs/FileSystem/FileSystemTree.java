@@ -36,7 +36,7 @@ public class FileSystemTree implements Serializable {
 
         // If the path is empty or only contains the file name, handle it
         if (pathParts.length == 0 || pathParts[0].isEmpty()) {
-            throw new IllegalArgumentException("Invalid pathname");
+            throw new IllegalArgumentException("invalid pathname");
         }
 
         // Separate the directory path from the file name
@@ -52,7 +52,7 @@ public class FileSystemTree implements Serializable {
             }
         }
 
-        if (fileToDelete == null) { throw new IllegalArgumentException("File " + fileName + " not found in path " + pathname); }
+        if (fileToDelete == null) { throw new IllegalArgumentException("file \"" + fileName + "\" not found in path \"" + pathname + "\""); }
 
         // Remove the file from the directory
         currentDir.deleteFile(fileToDelete.getFilename());
@@ -94,7 +94,7 @@ public class FileSystemTree implements Serializable {
 
         // If the path is empty or only contains the file name, handle it
         if (pathParts.length == 0 || pathParts[0].isEmpty()) {
-            throw new IllegalArgumentException("Invalid path");
+            throw new IllegalArgumentException("invalid path");
         }
 
         // Separate the directory path from the file name
@@ -109,7 +109,7 @@ public class FileSystemTree implements Serializable {
         }
 
         // If the file is not found, return null or throw an exception
-        throw new IllegalArgumentException("File " + fileName + " not found at path " + path);
+        throw new IllegalArgumentException("file \"" + fileName + "\" not found at path \"" + path + "\"");
     }
 
     // ================================================ HELPER =========================================================
@@ -126,7 +126,7 @@ public class FileSystemTree implements Serializable {
                 currentDir.addSubDirectory(dir, new DirectoryNode(dir));
             } else if (temp == null) {
                 // If directory doesn't exist and recursive flag is false, throw exception
-                throw new IllegalArgumentException("Directory " + dir + " not found");
+                throw new IllegalArgumentException("directory \"" + dir + "\" not found");
             }
 
             // Update the current directory to the next subdirectory
@@ -143,7 +143,7 @@ public class FileSystemTree implements Serializable {
         for (String dir : dirs) {
             DirectoryNode subDir = currentDir.getSubDirectory(dir);
             if (subDir == null) {
-                throw new IllegalArgumentException("Directory " + dir + " not found in path " + Arrays.toString(dirs));
+                throw new IllegalArgumentException("directory \"" + dir + "\" not found in path \"" + Arrays.toString(dirs) + "\"");
             }
             currentDir = subDir;  // Move to the next level
         }
