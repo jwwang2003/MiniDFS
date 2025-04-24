@@ -1,6 +1,6 @@
 package com.lab1.distributedfs.FileSystem;
 
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -50,11 +50,12 @@ public class BlockNode implements Serializable {
     public int expand(int size) {
         // Appending more data to the current block (if it is not full)
         // Note that here is no "shrink" method
-        if (size + this.blockSize > CONST.BLOCK_SIZE) { return -1; }
+        if (size + this.blockSize > Const.BLOCK_SIZE) { return -1; }
         return this.blockSize += size;
     }
 
     public int getFreeSpace() {
-        return CONST.BLOCK_SIZE - this.blockSize;
+        return Const.BLOCK_SIZE - this.blockSize;
     }
+    public int getSize() { return blockSize; }
 }

@@ -1,6 +1,6 @@
 package com.lab1.distributedfs.ShellCommand;
 
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.RequestType;
 import com.lab1.distributedfs.Message.ResponseType;
@@ -30,7 +30,7 @@ public class LSFSCommand extends Command {
 
         try {
             requestQueue.put(
-                new Message<>(CONST.MAIN_NODE_ID, RequestType.LSFS, null)
+                new Message<>(Const.MAIN_NODE_ID, RequestType.LSFS, null)
             );
             Message<?> lsReply = waitForResponse();
             assert lsReply != null;

@@ -15,26 +15,18 @@ public class FileNode implements Serializable {
     private final long fileSize;
     private final List<BlockNode> blockList;
     private final FileFormat fileFormat; // Variable to hold the file format
-    private boolean acquired;
-
-    public FileNode(String path, String fileName, long fileSize, List<BlockNode> blockList) {
-        this.path = path;
-        this.filename = fileName;
-        this.fileSize = fileSize;
-        this.blockList = blockList;
-        this.fileFormat = FileFormat.fromExtension(fileName);
-        this.acquired = false;
-    }
 
     // New constructor that extracts filename from path
-    public FileNode(String path, long fileSize, List<BlockNode> blockList) {
+    public FileNode(String path, List<BlockNode> blockList) {
         this.path = path;
         // Extract the filename from the path
         this.filename = new File(path).getName();
-        this.fileSize = fileSize;
+        // Determine file size
+        long tempSize = 0;
+        for (BlockNode blockNode : blockList) { tempSize += blockNode.getSize(); }
+        this.fileSize = tempSize;
         this.blockList = blockList;
         this.fileFormat = FileFormat.fromExtension(filename); // Extract file format based on the filename
-        this.acquired = false;
     }
 
     public String getPath() {
@@ -58,22 +50,11 @@ public class FileNode implements Serializable {
         return fileFormat; // Getter to access the file format
     }
 
-    public void aquire() {
-        this.acquired = true;
-    }
-
-    public void release() {
-        this.acquired = false;
-    }
-
-    public boolean isAquired() {
-        return this.acquired;
-    }
-
     @Override
     public String toString() {
         return "FileNode{" +
-                "filename='" + filename + '\'' +
+                "path='" + path + '\'' +
+                ", filename='" + filename + '\'' +
                 ", fileSize=" + fileSize +
                 ", blockCount=" + blockList.size() +
                 ", fileFormat=" + fileFormat +  // Include file format in toString

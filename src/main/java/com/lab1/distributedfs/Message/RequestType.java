@@ -15,7 +15,7 @@ public enum RequestType {
     ADD,
     DELETE,         // Removes a file based on its "filename", or a specific blockID?
 
-    LSFS,
+    LSFS,           // Display file system
 
     HEARTBEAT,      // Check the worker thread is alive
     EXIT            // Worker thread exits

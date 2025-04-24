@@ -11,7 +11,7 @@ public class WriteFile extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: write_file <data_path> <pathname>?
+                Usage: write_file <data_path> <pathname>?
                     Data read from the data file will be appended to the most
                     recently opened file or file specified by the pathname.
                     <data_path> - Path to the data file to we want to write (or append).

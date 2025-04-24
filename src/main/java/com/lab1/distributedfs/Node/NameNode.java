@@ -1,6 +1,6 @@
 package com.lab1.distributedfs.Node;
 
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.FileSystem.FileSystemTree;
 import com.lab1.distributedfs.Message.Message;
@@ -39,13 +39,13 @@ public class NameNode extends Node {
 
     public NameNode(ConcurrentHashMap<Integer, Node> dataNodes, MessageBroker messageBroker) {
         // The node ID for the name node is 0 by default (there is always only one)
-        super(CONST.NAME_NODE_ID, messageBroker);
+        super(Const.NAME_NODE_ID, messageBroker);
 
         this.fileSystemTree = new FileSystemTree();
         this.dataNodeLastSeen = new HashMap<>();
 
         // Check for persistence
-        String persistFilePath = CONST.getPath(CONST.FS_IMAGE_FILE);
+        String persistFilePath = Const.getPath(Const.FS_IMAGE_FILE);
         File persistFile = new File(persistFilePath);
         if (persistFile.exists()) {
             try {
@@ -85,6 +85,8 @@ public class NameNode extends Node {
                 switch (message.getRequestType()) {
                     case RequestType.LSFS -> handleLSFS(message);
                     case RequestType.FIND -> handleFind(message);
+                    case RequestType.ADD -> handleAdd(message);
+                    case RequestType.DELETE -> handleDelete(message);
                     case RequestType.EXIT -> handleExit();
                 }
             }
@@ -113,10 +115,14 @@ public class NameNode extends Node {
         if (message.getData() instanceof String path) {
             try {
                 FileNode fileNode = this.fileSystemTree.getFile(path);
-                this.messageBroker.broadcast(new Message<>(this.getNodeID(), ResponseType.FOUND, fileNode));
+                this.messageBroker.sendToSubscriber(
+                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.FOUND, fileNode)
+                );
             } catch (IllegalArgumentException e) {
                 String errorMessage = String.format("Error: file query \"%s\" failed with %s", path, e.getMessage());
-                this.messageBroker.broadcast(new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage));
+                this.messageBroker.sendToSubscriber(
+                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
+                );
             }
             return;
         }
@@ -125,18 +131,29 @@ public class NameNode extends Node {
 
     private void handleAdd(Message<?> message) {
         if (message.getData() instanceof FileNode fileNode) {
-            this.fileSystemTree.touch(fileNode.getPath(), fileNode);
+            this.fileSystemTree.touch(fileNode);
+            this.messageBroker.sendToSubscriber(
+                message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.ADD, fileNode)
+            );
             return;
         }
         throw new InvalidParameterException("Invalid command parameters (or data).");
     }
 
-    private void handleAppend(Message<?> message) {
-
-    }
-
     private void handleDelete(Message<?> message) {
-
+        if (message.getData() instanceof String path) {
+            try {
+                FileNode fileNode = this.fileSystemTree.rm(path);
+                this.messageBroker.sendToSubscriber(
+                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.DELETE, fileNode)
+                );
+            } catch (IllegalArgumentException e) {
+                String errorMessage = String.format("Error: file query \"%s\" failed with %s", path, e.getMessage());
+                this.messageBroker.sendToSubscriber(
+                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
+                );
+            }
+        }
     }
 
     private void handleExit() {
@@ -174,7 +191,7 @@ public class NameNode extends Node {
 
     private boolean persist() {
         try {
-            this.fileSystemTree.saveToFile(CONST.getPath(CONST.FS_IMAGE_FILE));
+            this.fileSystemTree.saveToFile(Const.getPath(Const.FS_IMAGE_FILE));
         } catch (IOException e) {
             System.out.println(e.getMessage());
             return false;

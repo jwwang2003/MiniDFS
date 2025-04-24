@@ -1,6 +1,6 @@
 package com.lab1.distributedfs.Node;
 
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.IO.DataNodeIO.*;
 import com.lab1.distributedfs.Message.*;
 import com.lab1.distributedfs.Message.MessageBroker;
@@ -39,7 +39,7 @@ public class DataNode extends Node {
         // Create directory to store blocks if it doesn't exist
         // node#/...
         String nodeDir = String.format("node%s", nodeID);
-        String path = Paths.get(CONST.getPath(CONST.DATANODE_ROOT_DIR), nodeDir).toString();
+        String path = Paths.get(Const.getPath(Const.DATANODE_ROOT_DIR), nodeDir).toString();
         this.storageDir = new File(path);
         if (!storageDir.exists()) {
             storageDir.mkdirs();
@@ -129,7 +129,7 @@ public class DataNode extends Node {
     private void handleWriteRequest(Message<?> message) {
         if (message.getData() instanceof WriteRequest writeRequest) {
             byte[] dataBytes = writeRequest.getData();  // Convert the incoming data to byte array
-            int totalBlocks = (int) Math.ceil((double) dataBytes.length / CONST.BLOCK_SIZE);
+            int totalBlocks = (int) Math.ceil((double) dataBytes.length / Const.BLOCK_SIZE);
 
             if (totalBlocks == 0) {
                 this.messageBroker.sendToSubscriber(0,

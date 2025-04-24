@@ -2,6 +2,7 @@ package FileSystem;
 
 import com.lab1.distributedfs.FileSystem.BlockNode;
 import com.lab1.distributedfs.FileSystem.DirectoryNode;
+import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.FileSystem.FileSystemTree;
 
 import org.junit.jupiter.api.AfterEach;
@@ -28,9 +29,11 @@ public class FileSystemTreeTest {
         blockList.add(new BlockNode(1, "", 128, new ArrayList<>()));
 
         // Adding files
-        fileSystemTree.touch("/", "file1.txt", 1024, blockList, false);
-        fileSystemTree.touch("/", "file2.txt", 1024, blockList, false);
-        fileSystemTree.touch("/tmp", "file3.txt", 1024, blockList, true);
+        fileSystemTree.touch("/file1.txt", blockList, true);
+        fileSystemTree.touch("file2.txt", blockList, true);
+        fileSystemTree.touch("/tmp/file3.txt", blockList, true);
+
+        FileNode file1 = new FileNode("/tmp/file3.txt", new ArrayList<>());
     }
 
     @Test
@@ -47,13 +50,14 @@ public class FileSystemTreeTest {
 
         // Test: Adding a file to a non-existing directory should throw an exception
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                fileSystemTree.touch("nonexistentDir", "file2.txt", 2048, blockList, false));
+                fileSystemTree.touch("nonexistentDir/file2.txt", blockList, false));
         assertEquals("Directory nonexistentDir not found", exception.getMessage());
     }
 
     @Test
     public void testDeleteFile_validPath() {
         // Delete file 'file2.txt' located in 'root/subdir1'
+        System.out.println(fileSystemTree.displayFileSystem());
         fileSystemTree.rm("/tmp/file3.txt");
         System.out.println(fileSystemTree.displayFileSystem());
     }
@@ -80,7 +84,7 @@ public class FileSystemTreeTest {
     @Test
     public void testSerializationDeserialization() throws IOException, ClassNotFoundException {
         // Serializing and then deserializing the file system
-        fileSystemTree.touch("/", "file1.txt", 1024, new ArrayList<>(), false);
+        fileSystemTree.touch("/file1.txt", new ArrayList<>(), false);
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(TEST_FILE_NAME))) {
             out.writeObject(fileSystemTree);
         }

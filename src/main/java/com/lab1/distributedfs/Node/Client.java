@@ -1,8 +1,9 @@
 package com.lab1.distributedfs.Node;
 
 import com.lab1.distributedfs.FileSystem.FileNode;
+import com.lab1.distributedfs.FileSystem.FileSystemTree;
 import com.lab1.distributedfs.IO.Client.Open;
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.Message.*;
 
 import java.util.concurrent.*;
@@ -40,10 +41,10 @@ public class Client implements Runnable {
         this.requestQueue = requestQueue;
         this.responseQueue = responseQueue;
         // Initialize the thread pool
-        this.executorService = Executors.newFixedThreadPool(CONST.NUM_NODES - 1);
+        this.executorService = Executors.newFixedThreadPool(Const.NUM_NODES - 1);
         this.nodeMap = new ConcurrentHashMap<>();
         // Communication
-        this.messageBroker = new MessageBroker(CONST.NUM_NODES);
+        this.messageBroker = new MessageBroker(Const.NUM_NODES);
         this.busyPaths = new ConcurrentHashMap<>();
     }
 
@@ -55,13 +56,13 @@ public class Client implements Runnable {
         executorService.execute(nameNode);
 
         // Initialize the DataNode workers
-        for (int i = 1; i < CONST.NUM_DATA_NODES + 1; i++) {
+        for (int i = 1; i < Const.NUM_DATA_NODES + 1; i++) {
             DataNode dataNode = new DataNode(i, this.messageBroker);
             nodeMap.put(i, dataNode);
             executorService.execute(dataNode);
         }
 
-        this.nodeID = CONST.CLIENT_NODE_ID;
+        this.nodeID = Const.CLIENT_NODE_ID;
 
         // Subscribe to the message broker and begin handling requests
         // Communication between threads (NameNode, DataNodes, & Client)
@@ -95,7 +96,7 @@ public class Client implements Runnable {
             case Request -> System.out.println("Error: unimplemented action");
             case Response -> {
                 switch (response.getResponseType()) {
-                    case LSFS, NOTFOUND -> responseQueue.put(response);
+                    case LSFS, FOUND, NOTFOUND, ADD, DELETE -> responseQueue.put(response);
                 }
             }
         }
@@ -108,11 +109,20 @@ public class Client implements Runnable {
                 // Remember to override the source node ID
                 message.setSrcNodeID(this.nodeID);
                 switch (message.getRequestType()) {
-                    case LSFS, FIND ->
+                    case LSFS, FIND, ADD ->
                         // Simply forward the FIND message to the name node
                         this.messageBroker.sendToSubscriber(
-                            CONST.NAME_NODE_ID, message
+                            Const.NAME_NODE_ID, message
                         );
+                    case DELETE -> {
+                        if (busyPaths.containsKey((String) message.getData())) {
+                            responseQueue.put(new Message<>(ResponseType.FAIL, "File is busy"));
+                        } else {
+                            this.messageBroker.sendToSubscriber(
+                                    Const.NAME_NODE_ID, message
+                            );
+                        }
+                    }
                     // Handle open & close commands
                     case OPEN -> this.handleOpenFile(message);
                     case CLOSE -> this.handleCloseFile(message);
@@ -139,12 +149,13 @@ public class Client implements Runnable {
 
     private void handleCloseFile(Message<?> message) throws InterruptedException {
         String path = (String) message.getData();
+
         if (busyPaths.isEmpty()) {
             responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "No files opened"));
             return;
         }
         try {
-            if (path.isEmpty()) {
+            if (FileSystemTree.getPathParts(path).length == 0) {
                 path = recentBusyPath;
                 recentBusyPath = null;
             }
@@ -159,16 +170,16 @@ public class Client implements Runnable {
                 return;
             }
 
-            responseQueue.put(new Message<>(this.nodeID, ResponseType.CLOSE, path));
+            responseQueue.put(new Message<>(this.nodeID, ResponseType.CLOSE, open));
             return;
         } catch (NullPointerException ignored) {}
+
         responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "File not found"));
     }
 
     public void handleWriteFile(String pathname, byte[] data) {
         if (!this.busyPaths.containsKey(pathname)) {
             System.out.println("File is not open.");
-            return;
         }
     }
 

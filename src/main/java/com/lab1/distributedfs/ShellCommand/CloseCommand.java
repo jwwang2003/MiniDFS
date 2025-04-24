@@ -1,12 +1,14 @@
 package com.lab1.distributedfs.ShellCommand;
 
+import com.lab1.distributedfs.FileSystem.FileNode;
+import com.lab1.distributedfs.FileSystem.FileSystemTree;
+import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.RequestType;
 import com.lab1.distributedfs.Message.ResponseType;
 
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.concurrent.TimeUnit;
 
 public class CloseCommand extends Command {
 
@@ -18,7 +20,7 @@ public class CloseCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: close
+                Usage: close
                     Closes the currently opened file and releases the R/W lock,
                     if multiple files are opened, it releases the most recently opened.
                     <pathname> - (Optional) Pathname of the file to close.""";
@@ -39,15 +41,27 @@ public class CloseCommand extends Command {
         String path = "";
         try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
 
+        String[] pathParts = FileSystemTree.getPathParts(path);
+        path = FileSystemTree.reconstructPathname(pathParts);
+
         try {
-            requestQueue.put(
-                new Message<>(RequestType.CLOSE, path)
-            );
+            requestQueue.put(new Message<>(RequestType.CLOSE, path));
             Message<?> closeReply = waitForResponse();
             assert closeReply != null;
 
-            if (closeReply.getResponseType() == ResponseType.CLOSE) {
-                System.out.println("Closed file \"" + closeReply.getData() + "\"");
+            if (closeReply.getResponseType() == ResponseType.CLOSE && closeReply.getData() instanceof Open open) {
+                System.out.println("Closed file \"" + open.path + "\"");
+            } else {
+                System.out.println("Error: " + closeReply.getData());
+                return true;
+            }
+
+            requestQueue.put(new Message<>(RequestType.ADD, open.fileNode));
+            Message<?> addReply = waitForResponse();
+            assert addReply != null;
+
+            if (addReply.getResponseType() == ResponseType.ADD && addReply.getData() instanceof FileNode fileNode) {
+                System.out.printf("Successfully updated fs tree %s\n", fileNode.getPath());
             } else {
                 System.out.println("Error: " + closeReply.getData());
             }

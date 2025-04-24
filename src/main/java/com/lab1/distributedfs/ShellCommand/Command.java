@@ -1,6 +1,6 @@
 package com.lab1.distributedfs.ShellCommand;
 
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.RequestType;
 import com.lab1.distributedfs.Node.Client;
@@ -24,7 +24,7 @@ public class Command {
     public static void shutdown() {
         System.out.println("Attempting to shutdown...");
         try {
-            requestQueue.put(new Message<>(CONST.MAIN_NODE_ID, RequestType.EXIT, null));
+            requestQueue.put(new Message<>(Const.MAIN_NODE_ID, RequestType.EXIT, null));
             executorService.shutdown();
             assert executorService.awaitTermination(5, TimeUnit.SECONDS);
             assert executorService.isTerminated();
@@ -35,7 +35,7 @@ public class Command {
 
     public static Message<?> waitForResponse() {
         try {
-            return responseQueue.poll(CONST.WORKER_TIMEOUT, TimeUnit.MILLISECONDS);
+            return responseQueue.poll(Const.WORKER_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             // That means the timer must have expired
             System.out.println("Fatal error: timeout");

@@ -11,7 +11,7 @@ public class ReadCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: read <pathname>?
+                Usage: read <pathname>?
                     Reads the contents of the currently opened file or
                     the file of the pathname (if specified).
                     <pathname> - (Optional) Pathname of the file to read.""";

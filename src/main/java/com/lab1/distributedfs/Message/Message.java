@@ -1,6 +1,6 @@
 package com.lab1.distributedfs.Message;
 
-import com.lab1.distributedfs.CONST;
+import com.lab1.distributedfs.Const;
 
 import java.io.Serializable;
 
@@ -45,7 +45,7 @@ public class Message<T> implements Serializable {
 
     // Constructor for a message of type "request"
     public Message(RequestType requestType, T data) {
-        this.srcNodeID = CONST.MAIN_NODE_ID;
+        this.srcNodeID = Const.MAIN_NODE_ID;
         this.messageType = MessageType.Request;
         this.requestType = requestType;
         this.data = data;
@@ -54,7 +54,7 @@ public class Message<T> implements Serializable {
 
     // Constructor for a message of type "response"
     public Message(ResponseType responseType, T data) {
-        this.srcNodeID = CONST.MAIN_NODE_ID;
+        this.srcNodeID = Const.MAIN_NODE_ID;
         this.messageType = MessageType.Response;
         this.responseType = responseType;
         this.data = data;

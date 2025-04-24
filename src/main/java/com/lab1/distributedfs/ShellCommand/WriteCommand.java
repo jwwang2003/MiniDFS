@@ -11,7 +11,7 @@ public class WriteCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: write <data> <pathname>?
+                Usage: write <data> <pathname>?
                     String data defined in <data> will be appended to the most
                     recently opened file or file specified by the pathname.
                     <data> - Any string of data.

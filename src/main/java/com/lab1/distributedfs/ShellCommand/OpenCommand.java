@@ -1,7 +1,7 @@
 package com.lab1.distributedfs.ShellCommand;
 
-import com.lab1.distributedfs.CONST;
 import com.lab1.distributedfs.FileSystem.FileNode;
+import com.lab1.distributedfs.FileSystem.FileSystemTree;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.IO.Client.OpenMode;
 import com.lab1.distributedfs.Message.Message;
@@ -9,7 +9,6 @@ import com.lab1.distributedfs.Message.RequestType;
 import com.lab1.distributedfs.Message.ResponseType;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 public class OpenCommand extends Command {
     @Override
@@ -20,7 +19,7 @@ public class OpenCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: open <filename> <mode>?
+                Usage: open <filename> <mode>?
                     <filename> - Name of the file to open.
                     <mode>? - (optional) Mode to open the file in (e.g., R(read), W(write)).""";
     }
@@ -38,7 +37,10 @@ public class OpenCommand extends Command {
         }
 
         try {
-            String path = commandArgs.get(0);
+            String path = commandArgs.getFirst();
+            String[] pathParts = FileSystemTree.getPathParts(path);
+            path = FileSystemTree.reconstructPathname(pathParts);
+
             OpenMode mode = commandArgs.size() > 1 ? OpenMode.valueOf(commandArgs.get(1).toUpperCase()) : OpenMode.W;
             try {
                 Open open = new Open(mode, path);
@@ -51,6 +53,7 @@ public class OpenCommand extends Command {
                 if (findReply.getResponseType() == ResponseType.FOUND && findReply.getData() instanceof FileNode fileNode) {
                     // File found
                     open = new Open(mode, path, fileNode);
+                    System.out.println("Found file: " + fileNode.getPath());
                 }
 
                 if (findReply.getResponseType() == ResponseType.NOTFOUND && mode != OpenMode.W) {
@@ -66,7 +69,7 @@ public class OpenCommand extends Command {
                 assert openReply != null;
 
                 if (openReply.getResponseType() == ResponseType.OPEN) {
-                    System.out.println("Opened new file \"" + path + "\"");
+                    System.out.println("Opened file \"" + open.fileNode.getPath() + "\"");
                 } else {
                     System.out.println("Error: " + openReply.getData());
                 }

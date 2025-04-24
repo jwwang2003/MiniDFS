@@ -2,7 +2,7 @@ package com.lab1.distributedfs;
 
 import java.nio.file.Paths;
 
-public class CONST {
+public class Const {
     // General Constants
     public static final int BYTE_SIZE = 1024;
     public static String ROOT = "./data";
