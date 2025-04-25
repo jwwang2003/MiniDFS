@@ -29,9 +29,9 @@ public class FileSystemTreeTest {
         blockList.add(new BlockNode(1, "", 128, new ArrayList<>()));
 
         // Adding files
-        fileSystemTree.touch("/file1.txt", blockList, true);
-        fileSystemTree.touch("file2.txt", blockList, true);
-        fileSystemTree.touch("/tmp/file3.txt", blockList, true);
+        fileSystemTree.touch(new FileNode("/file1.txt", blockList));
+        fileSystemTree.touch(new FileNode("file2.txt", blockList));
+        fileSystemTree.touch(new FileNode("/tmp/file3.txt", blockList));
 
         FileNode file1 = new FileNode("/tmp/file3.txt", new ArrayList<>());
     }
@@ -41,17 +41,6 @@ public class FileSystemTreeTest {
         DirectoryNode rootDir = fileSystemTree.getRoot();
         assertEquals(2, rootDir.getFiles().size(), "File count in root directory should be 2.");
         assertEquals("file1.txt", rootDir.getFiles().getFirst().getFilename(), "File name should be 'file1.txt'.");
-    }
-
-    @Test
-    public void testAddFile_invalidDirectory() {
-        List<BlockNode> blockList = new ArrayList<>();
-        blockList.add(new BlockNode(1, "", 128, new ArrayList<>()));
-
-        // Test: Adding a file to a non-existing directory should throw an exception
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                fileSystemTree.touch("nonexistentDir/file2.txt", blockList, false));
-        assertEquals("Directory nonexistentDir not found", exception.getMessage());
     }
 
     @Test
@@ -84,7 +73,8 @@ public class FileSystemTreeTest {
     @Test
     public void testSerializationDeserialization() throws IOException, ClassNotFoundException {
         // Serializing and then deserializing the file system
-        fileSystemTree.touch("/file1.txt", new ArrayList<>(), false);
+        FileNode fileNode = new FileNode("/file1.txt", new ArrayList<>());
+        fileSystemTree.touch(fileNode);
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(TEST_FILE_NAME))) {
             out.writeObject(fileSystemTree);
         }
