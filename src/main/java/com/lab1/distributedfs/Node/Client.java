@@ -1,7 +1,6 @@
 package com.lab1.distributedfs.Node;
 
 import com.lab1.distributedfs.FileSystem.FileNode;
-import com.lab1.distributedfs.FileSystem.FileSystemTree;
 import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.Const;
@@ -33,10 +32,10 @@ public class Client implements Runnable {
     private final ExecutorService executorService;
     private final ConcurrentHashMap<Integer, Node> nodeMap;
     // Communication
-    public MessageBroker messageBroker;
+    public final MessageBroker messageBroker;
     // Thread-safe hashmap to track "opened files" and also implement a locking mechanism
     private final ConcurrentHashMap<String, Open> busyPaths;
-    private List<String> recentBusyPath;
+    private final List<String> recentBusyPath;
 
     private int nodeID;
 
@@ -56,13 +55,13 @@ public class Client implements Runnable {
     @Override
     public void run() {
         // Initialize the NameNode worker
-        NameNode nameNode = new NameNode(nodeMap, messageBroker);
+        NameNode nameNode = new NameNode(messageBroker);
         nodeMap.put(nameNode.getNodeID(), nameNode);
         executorService.execute(nameNode);
 
         // Initialize the DataNode workers
         for (int i = 1; i < Const.NUM_DATA_NODES + 1; i++) {
-            DataNode dataNode = null;
+            DataNode dataNode;
             try {
                 dataNode = new DataNode(i, this.messageBroker);
             } catch (Exception e) {

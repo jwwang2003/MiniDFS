@@ -2,6 +2,7 @@ package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.Helper;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class WriteFileCommand extends Command {
@@ -37,7 +38,7 @@ public class WriteFileCommand extends Command {
             System.out.println(chunks.size());
 
             // Convert the first chunk back to a string (UTF-8)
-            String chunkString = new String(chunks.get(0), "UTF-8");
+            String chunkString = new String(chunks.getFirst(), StandardCharsets.UTF_8);
 
             // Print the chunk as a string
             System.out.println("First chunk in UTF-8 format: ");

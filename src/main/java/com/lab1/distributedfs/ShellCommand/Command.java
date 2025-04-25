@@ -14,12 +14,13 @@ public class Command {
     public static BlockingQueue<Message<?>> requestQueue = new LinkedBlockingQueue<>();
     public static BlockingQueue<Message<?>> responseQueue = new LinkedBlockingQueue<>();
 
-    public String getDescription() { return ""; };
+    public String getDescription() { return ""; }
+
     // Method to return the command help message
-    public String getHelpMessage() { return ""; };
+    public String getHelpMessage() { return ""; }
 
     // Method to handle the command logic
-    public boolean handle(List<String> commandArgs) { return false; };
+    public boolean handle(List<String> commandArgs) { return false; }
 
     public static void shutdown() {
         System.out.println("Attempting to shutdown...");

@@ -3,7 +3,6 @@ package com.lab1.distributedfs.Node;
 import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.IO.DataNodeIO.*;
 import com.lab1.distributedfs.Message.*;
-import com.lab1.distributedfs.Message.MessageBroker;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -35,7 +34,6 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class DataNode extends Node {
     private final File storageDir;
-    private final List<Block> blocks = Collections.synchronizedList(new ArrayList<>());
     private final AtomicInteger blockCount  = new AtomicInteger(0);
     private final AtomicLong storageUsed = new AtomicLong(0);
 
@@ -59,6 +57,7 @@ public class DataNode extends Node {
                 if (!f.isFile()) { continue; }
                 // reconstruct your Block object from its filename
                 Block block = new Block(this.nodeID, f.getName());
+                List<Block> blocks = Collections.synchronizedList(new ArrayList<>());
                 blocks.add(block);
                 blockCount.incrementAndGet();
                 storageUsed.addAndGet(f.length());
@@ -78,11 +77,7 @@ public class DataNode extends Node {
         this.messageBroker.subscribe(this.nodeID, message -> {
             // Handle message
             if (message != null) {
-                try {
-                    this.handleMessage(message);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+                this.handleMessage(message);
             }
         });
     }
@@ -92,7 +87,7 @@ public class DataNode extends Node {
     }
 
     // ========================================== INTERNAL FUNCTIONS ===================================================
-    private void handleMessage(Message<?> message) throws InterruptedException {
+    private void handleMessage(Message<?> message) {
         if (message.getMessageType() != MessageType.Request) {
             // DataNoes are "worker threads", they only accept request messages, they do not send any requests
             // Therefore, if the message is NOT a request, then something must have gone horribly wrong.
@@ -248,7 +243,6 @@ public class DataNode extends Node {
         ) {
             out.write(data);
             out.flush();
-            out.close();
         }
     }
 

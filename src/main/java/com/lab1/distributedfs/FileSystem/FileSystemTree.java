@@ -1,6 +1,5 @@
 package com.lab1.distributedfs.FileSystem;
 
-import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.Helper;
 
 import java.io.*;
@@ -28,7 +27,7 @@ public class FileSystemTree implements Serializable {
         path = Helper.reconstructPathname(pathParts.toArray(new String[0]));
 
         DirectoryNode currentDir = root;
-        currentDir = this.getSubDirectory(path, currentDir, true);
+        currentDir = this.getSubDirectory(path, currentDir);
         currentDir.addFile(fileNode.getFilename(), fileNode);
     }
 
@@ -115,19 +114,15 @@ public class FileSystemTree implements Serializable {
 
     // ================================================ HELPER =========================================================
 
-    private DirectoryNode getSubDirectory(String path, DirectoryNode currentDir, boolean recursive) {
+    private DirectoryNode getSubDirectory(String path, DirectoryNode currentDir) {
 
         String[] dirs = Helper.getPathParts(new File(path).getPath());
 
         // Traverse through the directories in the path
         for (String dir : dirs) {
             DirectoryNode temp = currentDir.getSubDirectory(dir);
-            if (temp == null && recursive) {
-                // If directory doesn't exist, create it (recursively)
+            if (temp == null) {
                 currentDir.addSubDirectory(dir, new DirectoryNode(dir));
-            } else if (temp == null) {
-                // If directory doesn't exist and recursive flag is false, throw exception
-                throw new IllegalArgumentException("directory \"" + dir + "\" not found");
             }
 
             // Update the current directory to the next subdirectory

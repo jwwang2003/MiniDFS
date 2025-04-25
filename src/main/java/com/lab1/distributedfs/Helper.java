@@ -63,7 +63,7 @@ public class Helper {
         return chunks;
     }
 
-    public static List<byte[]> splitDataIntoChunks(byte[] data) throws IOException {
+    public static List<byte[]> splitDataIntoChunks(byte[] data) {
         List<byte[]> chunks = new ArrayList<>();
         int dataLength = data.length;
         int chunkSize = Const.BLOCK_SIZE; // Assuming BLOCK_SIZE is the chunk size (e.g., 4KB)

@@ -5,7 +5,7 @@ import java.nio.file.Paths;
 public class Const {
     // General Constants
     public static final int BYTE_SIZE = 1024;
-    public static String ROOT = "./data";
+    public static final String ROOT = "./data";
 
     // File Metadata Constants
     public static final String FS_IMAGE_FILE = "fsimage.ser";   // Metadata file for NameNode

@@ -36,7 +36,7 @@ public class NameNode extends Node {
     // For handling heartbeat
     private final ScheduledExecutorService scheduledExecutorService;
 
-    public NameNode(ConcurrentHashMap<Integer, Node> dataNodes, MessageBroker messageBroker) {
+    public NameNode(MessageBroker messageBroker) {
         // The node ID for the name node is 0 by default (there is always only one)
         super(Const.NAME_NODE_ID, messageBroker);
 
@@ -106,7 +106,7 @@ public class NameNode extends Node {
 
     // [Requests]
 
-    private void handleLSFS(Message<?> message) throws InterruptedException {
+    private void handleLSFS(Message<?> message) {
         this.messageBroker.sendToSubscriber(
             message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.LSFS, this.fileSystemTree.displayFileSystem())
         );

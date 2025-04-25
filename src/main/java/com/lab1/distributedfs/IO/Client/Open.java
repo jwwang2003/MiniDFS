@@ -5,9 +5,9 @@ import com.lab1.distributedfs.FileSystem.FileNode;
 import java.util.ArrayList;
 
 public class Open {
-    public OpenMode openMode;
-    public String path;
-    public FileNode fileNode;
+    public final OpenMode openMode;
+    public final String path;
+    public final FileNode fileNode;
 
     public Open(OpenMode openMode, String path) {
         this.openMode = openMode;

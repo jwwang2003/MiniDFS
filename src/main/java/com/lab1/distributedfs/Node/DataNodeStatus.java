@@ -1,7 +1,7 @@
 package com.lab1.distributedfs.Node;
 
 public class DataNodeStatus {
-    public int nodeId;
+    public final int nodeId;
     public long lastSeen;
     public boolean alive;
     public int blockCount;

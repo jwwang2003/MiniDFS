@@ -10,7 +10,7 @@ public class Block {
     private final int nodeID;
     private final int replica;
     private final String pathname;
-    private final int blockID;          // Bascially the index of the data chunk
+    private final int blockID;          // Basically the index of the data chunk
 
     // Regex expression for the naming pattern of blocks within a DataNode
     // File naming format replica{i}_pathname_block{i}.{file extension}

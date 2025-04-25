@@ -56,7 +56,7 @@ public class FileSystemTreeTest {
 
     @Test
     public void testDeleteFile_validPath() {
-        // Delete file 'file2.txt' located in 'root/subdir1'
+        // Delete file 'file2.txt' located in 'root/sub_dir1'
         System.out.println(fileSystemTree.displayFileSystem());
         fileSystemTree.rm("/tmp/file3.txt");
         System.out.println(fileSystemTree.displayFileSystem());

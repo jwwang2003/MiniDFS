@@ -1,7 +1,6 @@
 package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.FileSystem.FileNode;
-import com.lab1.distributedfs.FileSystem.FileSystemTree;
 import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.IO.Client.OpenMode;
@@ -45,7 +44,7 @@ public class OpenCommand extends Command {
             OpenMode mode = commandArgs.size() > 1 ? OpenMode.valueOf(commandArgs.get(1).toUpperCase()) : OpenMode.W;
             try {
                 Open open = new Open(mode, path);
-                Message<?> openReply = null;
+                Message<?> openReply;
 
                 requestQueue.put(new Message<>(RequestType.FIND, path));
                 Message<?> findReply = waitForResponse();
