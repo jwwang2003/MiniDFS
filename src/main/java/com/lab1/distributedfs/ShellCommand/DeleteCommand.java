@@ -1,7 +1,7 @@
 package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.FileSystem.FileNode;
-import com.lab1.distributedfs.FileSystem.FileSystemTree;
+import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.RequestType;
 import com.lab1.distributedfs.Message.ResponseType;
@@ -18,10 +18,10 @@ public class DeleteCommand extends Command{
     @Override
     public String getHelpMessage() {
         return """
-                Usage: delete <pathname>?
+                Usage: delete <pathname>
                     Deletes the data of the most recently opened file or
                     the file specified by the pathname (if specified).
-                    <pathname> - (Optional) Pathname of the file to delete.""";
+                    <pathname> - Pathname of the file to delete.""";
     }
 
     @Override
@@ -31,16 +31,16 @@ public class DeleteCommand extends Command{
             return true;
         }
 
-        if (commandArgs.size() > 1) {
-            System.out.println("Error: delete accepts one or no argument.");
+        if (commandArgs.isEmpty()) {
+            System.out.println("Error: delete requires at least one argument");
             return true;
         }
 
         String path = "";
         try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
 
-        String[] pathParts = FileSystemTree.getPathParts(path);
-        path = FileSystemTree.reconstructPathname(pathParts);
+        String[] pathParts = Helper.getPathParts(path);
+        path = Helper.reconstructPathname(pathParts);
 
         try {
             requestQueue.put(new Message<>(RequestType.DELETE, path));

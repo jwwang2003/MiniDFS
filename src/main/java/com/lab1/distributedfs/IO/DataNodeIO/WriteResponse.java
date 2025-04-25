@@ -1,17 +1,15 @@
 package com.lab1.distributedfs.IO.DataNodeIO;
 
-import com.lab1.distributedfs.Node.DataNode;
-
 public class WriteResponse extends WriteRequest{
     private final int bytesWritten;
 
     public WriteResponse(WriteRequest writeRequest, int bytesWritten) {
-        super(writeRequest.getReplica(), writeRequest.getFilename(), writeRequest.getBlockID(), writeRequest.getData());
+        super(writeRequest);
         this.bytesWritten = bytesWritten;
     }
 
-    public String getFileName() {
-        return DataNode.getBlockName(this.getReplica(), this.getFilename(), this.getBlockID());
+    public String getFilename() {
+        return getBlockName(this.getReplica(), this.getPathname(), this.getBlockID());
     }
 
     public int getNumBytesWritten() {

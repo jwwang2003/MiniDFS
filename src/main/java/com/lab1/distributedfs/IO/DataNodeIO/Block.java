@@ -1,66 +1,66 @@
 package com.lab1.distributedfs.IO.DataNodeIO;
 
 import com.lab1.distributedfs.Const;
-import com.lab1.distributedfs.Node.DataNode;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Block {
     // Basic attributes
+    private final int nodeID;
     private final int replica;
-    private final String filename;
-    private final int blockID;
+    private final String pathname;
+    private final int blockID;          // Bascially the index of the data chunk
 
     // Regex expression for the naming pattern of blocks within a DataNode
+    // File naming format replica{i}_pathname_block{i}.{file extension}
     public static final Pattern pattern = Pattern.compile("replica(\\d+)_([^_]+)_block(\\d+)" + Const.BLOCK_FILETYPE);
 
-    // Constructor that takes replica, filename, and blockID
-    public Block(int replica, String filename, int blockID) {
+    // Constructor that takes replica, pathname, and blockID
+    public Block(int nodeID, int replica, String pathname, int blockID) {
+        this.nodeID = nodeID;
         this.replica = replica;
-        this.filename = filename;
+        this.pathname = pathname;
         this.blockID = blockID;
     }
 
     // Constructor that extracts replica and blockID from the filename using regex
-    public Block(String filename) {
-        // Using regex to extract replica and blockID
-        int[] replicaAndBlock = extractReplicaAndBlockFromFilename(filename);
-        this.replica = replicaAndBlock[0];
-        this.blockID = replicaAndBlock[1];
-        this.filename = filename;
+    public Block(int nodeID, String path) throws Exception {
+        this.nodeID = nodeID;
+
+        // Regex to match filenames like "replica1_file_block2.blk"
+        Matcher matcher = pattern.matcher(path);
+
+        if (matcher.find()) {
+            // Extract replica and blockID from the matcher groups
+            this.replica = Integer.parseInt(matcher.group(1));  // Extract replica number
+            this.pathname = matcher.group(2);
+            this.blockID = Integer.parseInt(matcher.group(3));  // Extract block number
+        } else {
+            throw new Exception("invalid filename format (data node block)");
+        }
     }
 
-    public String getFileName() {
-        return DataNode.getBlockName(this.replica, this.filename, this.blockID) + Const.BLOCK_FILETYPE;
+    public int getNodeID() { return nodeID; }
+
+    public String getFilename() {
+        return getBlockName(this.replica, this.pathname, this.blockID).replace("/", "\\") + Const.BLOCK_FILETYPE;
     }
 
     public int getReplica() {
         return replica;
     }
 
-    public String getFilename() {
-        return filename;
+    public String getPathname() {
+        return pathname;
     }
 
     public int getBlockID() {
         return blockID;
     }
 
-    // Method to extract replica and blockID from the filename using regex
-    private int[] extractReplicaAndBlockFromFilename(String filename) {
-        // Regex to match filenames like "replica1_myfile_block2.blk"
-        Matcher matcher = pattern.matcher(filename);
-
-        if (matcher.find()) {
-            // Extract replica and blockID from the matcher groups
-            int replica = Integer.parseInt(matcher.group(1));  // Extract replica number
-            int blockID = Integer.parseInt(matcher.group(3));  // Extract block number
-            return new int[] { replica, blockID };
-        } else {
-            // Return default values if the filename does not match the expected format
-            System.out.printf("Error: Invalid filename format: %s%n", filename);
-            return new int[] { -1, -1 };  // Indicate failure to parse
-        }
+    // Static helper function
+    static public String getBlockName(int replica, String filename, int block) {
+        return String.format("replica%s_%s_block%s", replica, filename, block);
     }
 }

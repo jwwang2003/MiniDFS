@@ -1,6 +1,7 @@
 package com.lab1.distributedfs.FileSystem;
 
 import com.lab1.distributedfs.Const;
+import com.lab1.distributedfs.Helper;
 
 import java.io.*;
 import java.util.*;
@@ -22,9 +23,9 @@ public class FileSystemTree implements Serializable {
 
     public void touch(FileNode fileNode) {
         String path = fileNode.getPath();
-        List<String> pathParts = Arrays.stream(getPathParts(path)).toList();
+        List<String> pathParts = Arrays.stream(Helper.getPathParts(path)).toList();
         pathParts = pathParts.subList(0, pathParts.size() - 1);
-        path = reconstructPathname(pathParts.toArray(new String[0]));
+        path = Helper.reconstructPathname(pathParts.toArray(new String[0]));
 
         DirectoryNode currentDir = root;
         currentDir = this.getSubDirectory(path, currentDir, true);
@@ -32,7 +33,7 @@ public class FileSystemTree implements Serializable {
     }
 
     public FileNode rm(String pathname) {
-        String[] pathParts = getPathParts(pathname);
+        String[] pathParts = Helper.getPathParts(pathname);
 
         // If the path is empty or only contains the file name, handle it
         if (pathParts.length == 0 || pathParts[0].isEmpty()) {
@@ -90,7 +91,7 @@ public class FileSystemTree implements Serializable {
     }
 
     public FileNode getFile(String path) {
-        String[] pathParts = getPathParts(path);
+        String[] pathParts = Helper.getPathParts(path);
 
         // If the path is empty or only contains the file name, handle it
         if (pathParts.length == 0 || pathParts[0].isEmpty()) {
@@ -116,7 +117,7 @@ public class FileSystemTree implements Serializable {
 
     private DirectoryNode getSubDirectory(String path, DirectoryNode currentDir, boolean recursive) {
 
-        String[] dirs = getPathParts(new File(path).getPath());
+        String[] dirs = Helper.getPathParts(new File(path).getPath());
 
         // Traverse through the directories in the path
         for (String dir : dirs) {
@@ -165,38 +166,6 @@ public class FileSystemTree implements Serializable {
         }
     }
 
-    public static String[] getPathParts(String pathname) {
-        // Split the pathname into directories and file name
-        String[] pathParts = pathname.trim().split("/");
-        // Remove any empty strings from the array
-        return Arrays.stream(pathParts)
-                .filter(dir -> !dir.isEmpty())
-                .toArray(String[]::new);
-    }
-
-    public static String reconstructPathname(String[] pathParts) {
-        // Remove any empty strings from the array
-        pathParts = Arrays.stream(pathParts)
-                .filter(dir -> !dir.isEmpty())
-                .toArray(String[]::new);
-
-        // Join the path parts with "/"
-        String reconstructedPath = String.join("/", pathParts);
-
-        // If you want to ensure there is no leading or trailing slash, you can remove them
-        // Remove leading slash (if present)
-        if (reconstructedPath.startsWith("/")) {
-            reconstructedPath = reconstructedPath.substring(1);
-        }
-
-        // Remove trailing slash (if present)
-        if (reconstructedPath.endsWith("/")) {
-            reconstructedPath = reconstructedPath.substring(0, reconstructedPath.length() - 1);
-        }
-
-        return "/" + reconstructedPath;
-    }
-
     // ================================================ OUTPUT =========================================================
 
     // Method to display the file system structure
@@ -218,29 +187,5 @@ public class FileSystemTree implements Serializable {
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(filename))) {
             return (FileSystemTree) in.readObject();
         }
-    }
-
-    // ======================================== STATIC HELPER FUNCTIONS ================================================
-
-    // Method to read the file and split it into chunks of 4KB (or whatever that is specified int the constants)
-    public static List<byte[]> splitFileIntoChunks(String filePath) throws IOException {
-        List<byte[]> chunks = new ArrayList<>();
-        File file = new File(filePath);
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] buffer = new byte[Const.BLOCK_SIZE];
-            int bytesRead;
-
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                if (bytesRead < Const.BLOCK_SIZE) {
-                    // If bytesRead is less than CHUNK_SIZE, resize the buffer to the actual bytes read
-                    byte[] chunk = new byte[bytesRead];
-                    System.arraycopy(buffer, 0, chunk, 0, bytesRead);
-                    chunks.add(chunk);
-                } else {
-                    chunks.add(buffer.clone());
-                }
-            }
-        }
-        return chunks;
     }
 }

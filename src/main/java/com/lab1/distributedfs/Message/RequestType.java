@@ -1,14 +1,13 @@
 package com.lab1.distributedfs.Message;
 
-/**
- * BlockIO should consist of: read operation, write operation, open & close a "file"
- */
 public enum RequestType {
     // General IO
     OPEN,
     CLOSE,
     WRITE,
     READ,
+
+    STAT,           // Request a status update from the data node(s)
 
     // Extended IO (operations for the FS tree, a.k.a. name node)
     FIND,           // Index the FS tree for a file based on the provided path

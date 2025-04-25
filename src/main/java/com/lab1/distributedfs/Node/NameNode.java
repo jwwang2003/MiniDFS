@@ -12,7 +12,6 @@ import com.lab1.distributedfs.Message.MessageBroker;
 import java.io.File;
 import java.io.IOException;
 import java.security.InvalidParameterException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -31,8 +30,8 @@ import java.util.concurrent.TimeUnit;
  * After the client receives the metadata, they directly request the data nodes for the respective chunks
  */
 public class NameNode extends Node {
-    private FileSystemTree fileSystemTree;                                  // The name node manages a file system tree
-    private final Map<Integer, Long> dataNodeLastSeen;     // Tracks the milliseconds since a heartbeat ACK
+    private FileSystemTree fileSystemTree;                  // The name node manages a file system tree
+    private final Map<Integer, DataNodeStatus> dataNodeStatus;
 
     // For handling heartbeat
     private final ScheduledExecutorService scheduledExecutorService;
@@ -42,7 +41,7 @@ public class NameNode extends Node {
         super(Const.NAME_NODE_ID, messageBroker);
 
         this.fileSystemTree = new FileSystemTree();
-        this.dataNodeLastSeen = new HashMap<>();
+        this.dataNodeStatus = new ConcurrentHashMap<>();
 
         // Check for persistence
         String persistFilePath = Const.getPath(Const.FS_IMAGE_FILE);
@@ -57,6 +56,7 @@ public class NameNode extends Node {
 
         this.scheduledExecutorService = Executors.newScheduledThreadPool(2);
         this.scheduleHeartbeatRequest();
+        this.scheduleDataNodeStatusCheck();
     }
 
     public int getNodeID() {
@@ -87,6 +87,7 @@ public class NameNode extends Node {
                     case RequestType.FIND -> handleFind(message);
                     case RequestType.ADD -> handleAdd(message);
                     case RequestType.DELETE -> handleDelete(message);
+                    case RequestType.STAT -> handleStat(message);
                     case RequestType.EXIT -> handleExit();
                 }
             }
@@ -94,6 +95,7 @@ public class NameNode extends Node {
                 // Name node handling a response from a data or client node
                 switch (message.getResponseType()) {
                     case ResponseType.ACK -> handleHeartbeatACK(message);
+                    case ResponseType.STAT -> handleStatResponse(message);
                 }
             }
             default ->
@@ -156,6 +158,12 @@ public class NameNode extends Node {
         }
     }
 
+    private void handleStat(Message<?> message) {
+        this.messageBroker.sendToSubscriber(
+            message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.STAT, this.dataNodeStatus)
+        );
+    }
+
     private void handleExit() {
         System.out.printf("NameNode %s exiting...\n", this.nodeID);
         this.scheduledExecutorService.shutdown();
@@ -177,14 +185,21 @@ public class NameNode extends Node {
         long currentTime = System.nanoTime();
         int senderID = message.getSrcNodeID();
 
-        if (this.dataNodeLastSeen.containsKey(senderID)) {
-            long time = this.dataNodeLastSeen.get(senderID);
-            long diff = currentTime - time;
+        if (this.dataNodeStatus.containsKey(senderID)) {
+            DataNodeStatus datanodeStatus = this.dataNodeStatus.get(senderID);
+            long diff = currentTime - datanodeStatus.lastSeen;
             // Update the diff value
-            dataNodeLastSeen.replace(senderID, currentTime);
+            datanodeStatus.lastSeen = currentTime;
+            this.dataNodeStatus.replace(senderID, datanodeStatus);
         } else {
-            dataNodeLastSeen.put(senderID, currentTime);
+            this.dataNodeStatus.put(senderID, new DataNodeStatus(message.getSrcNodeID(), currentTime));
         }
+    }
+
+    private void handleStatResponse(Message<?> message) {
+        int senderID = message.getSrcNodeID();
+        DataNodeStatus datanodeStatus = (DataNodeStatus) message.getData();
+        this.dataNodeStatus.put(senderID, datanodeStatus);
     }
 
     // Other methods
@@ -207,6 +222,19 @@ public class NameNode extends Node {
             // Send heartbeat request to each DataNode's request queue
             Message<?> heartbeatRequest = new Message<>(this.nodeID, RequestType.HEARTBEAT, null);
             this.messageBroker.broadcast(heartbeatRequest);
-        }, 0, 1, TimeUnit.SECONDS);  // Initial delay 0, repeat every 1 second
+        }, 0, 50, TimeUnit.MILLISECONDS);
     }
+
+    private void scheduleDataNodeStatusCheck() {
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            long now = System.currentTimeMillis();
+            for (DataNodeStatus status : dataNodeStatus.values()) {
+                // Alive if lastSeen was within timeout
+                status.alive = (now - status.lastSeen) <= Const.WORKER_TIMEOUT;
+                Message<?> statusRequest = new Message<>(this.nodeID, RequestType.STAT, status);
+                this.messageBroker.sendToSubscriber(status.nodeId, statusRequest);
+            }
+        }, 0, 100, TimeUnit.MILLISECONDS);
+    }
+
 }

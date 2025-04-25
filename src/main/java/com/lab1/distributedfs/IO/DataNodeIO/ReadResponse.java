@@ -4,7 +4,7 @@ public class ReadResponse extends ReadRequest {
     private final byte[] data;
 
     public ReadResponse(ReadRequest readRequest, byte[] data) {
-        super(readRequest.getDataNodeID(), readRequest.getReplica(), readRequest.getFilename(), readRequest.getBlockID());
+        super(readRequest.getNodeID(), readRequest.getReplica(), readRequest.getPathname(), readRequest.getBlockID());
         this.data = data;
     }
 

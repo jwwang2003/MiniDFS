@@ -2,6 +2,7 @@ package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.FileSystem.FileSystemTree;
+import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.IO.Client.OpenMode;
 import com.lab1.distributedfs.Message.Message;
@@ -38,8 +39,8 @@ public class OpenCommand extends Command {
 
         try {
             String path = commandArgs.getFirst();
-            String[] pathParts = FileSystemTree.getPathParts(path);
-            path = FileSystemTree.reconstructPathname(pathParts);
+            String[] pathParts = Helper.getPathParts(path);
+            path = Helper.reconstructPathname(pathParts);
 
             OpenMode mode = commandArgs.size() > 1 ? OpenMode.valueOf(commandArgs.get(1).toUpperCase()) : OpenMode.W;
             try {

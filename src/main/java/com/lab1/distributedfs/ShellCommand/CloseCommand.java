@@ -2,6 +2,7 @@ package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.FileSystem.FileSystemTree;
+import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.RequestType;
@@ -34,15 +35,16 @@ public class CloseCommand extends Command {
         }
 
         if (commandArgs.size() > 1) {
-            System.out.println("Error: close accepts one or no argument.");
+            System.out.println("Error: invalid arguments.");
+            System.out.println(this.getHelpMessage());
             return true;
         }
 
         String path = "";
         try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
 
-        String[] pathParts = FileSystemTree.getPathParts(path);
-        path = FileSystemTree.reconstructPathname(pathParts);
+        String[] pathParts = Helper.getPathParts(path);
+        path = Helper.reconstructPathname(pathParts);
 
         try {
             requestQueue.put(new Message<>(RequestType.CLOSE, path));
