@@ -1,11 +1,16 @@
 package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.Helper;
+import com.lab1.distributedfs.IO.Client.Open;
+import com.lab1.distributedfs.IO.Client.OpenMode;
+import com.lab1.distributedfs.Message.Message;
+import com.lab1.distributedfs.Message.MessageAction;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-public class WriteFileCommand extends Command {
+public class WriteFileCommand extends WriteCommand {
     @Override
     public String getDescription() {
         return "write_file: Writes data from an external file to a \"virtual\" file.";
@@ -23,31 +28,40 @@ public class WriteFileCommand extends Command {
 
     @Override
     public boolean handle(List<String> commandArgs) {
+        if (!commandArgs.isEmpty() && commandArgs.getFirst().equals("help")) {
+            System.out.println(this.getHelpMessage());
+            return true;
+        }
+
         if (commandArgs.isEmpty()) {
             System.out.println("Error: write_file expects at least one argument.");
             return false;
         }
 
         String dataFilePath = commandArgs.get(0);
-        String virtualFilePath = commandArgs.size() > 1 ? commandArgs.get(1) : null;
+        String path = commandArgs.size() > 1 ? commandArgs.get(1) : "";
 
         try {
             // Read and split the file into chunks
-            List<byte[]> chunks = Helper.splitFileIntoChunks(dataFilePath);
+            byte[] data = Helper.readFileIntoByteArray(dataFilePath);
+            List<byte[]> chunks = Helper.splitFileIntoChunks(data);
 
-            System.out.println(chunks.size());
+            makeRequest(MessageAction.OPEN, new Open(OpenMode.W, path));
+            Message<?> openReply = waitForResponse();
+            assert openReply != null;
 
-            // Convert the first chunk back to a string (UTF-8)
-            String chunkString = new String(chunks.getFirst(), StandardCharsets.UTF_8);
+            if (openReply.getMessageAction() != MessageAction.OPEN) throw new Exception(String.valueOf(openReply.getData()));
+            assert openReply.getMessageAction() == MessageAction.OPEN && openReply.getData() instanceof Open;
 
-            // Print the chunk as a string
-            System.out.println("First chunk in UTF-8 format: ");
-            System.out.println(chunkString);
-
-            // Process the chunks and write them to the virtual file
-//            client.handleWriteFile(chunks, virtualFilePath);
+            Open open = (Open) openReply.getData();
+            this.handleWrite(open, data);
         } catch (IOException e) {
-            System.out.println("Error reading data file: " + e.getMessage());
+            System.out.printf("Error: %s.\n", e.getMessage());
+            return true;
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
             return true;
         }
 

@@ -71,6 +71,7 @@ public class DirectoryNode implements Serializable {
 
     // Delete a file by its name
     public void deleteFile(String fileName) {
+        if (fileName.equals("/")) { return; }
         if (files.containsKey(fileName)) {
             files.remove(fileName);
         } else {
@@ -91,5 +92,13 @@ public class DirectoryNode implements Serializable {
         } else {
             throw new IllegalArgumentException("subdirectory \"" + dirName + "\" not found in directory \"" + directoryName + "\"");
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof DirectoryNode) {
+            return this.directoryName.equals(((DirectoryNode) o).directoryName);
+        }
+        return false;
     }
 }

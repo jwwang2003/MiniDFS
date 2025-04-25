@@ -4,8 +4,7 @@ import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.Message.MessageAction;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -41,33 +40,32 @@ public class CloseCommand extends Command {
 
         String path = "";
         try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
-
         String[] pathParts = Helper.getPathParts(path);
         path = Helper.reconstructPathname(pathParts);
 
         try {
-            requestQueue.put(new Message<>(RequestType.CLOSE, path));
+            makeRequest(MessageAction.CLOSE, path);
             Message<?> closeReply = waitForResponse();
             assert closeReply != null;
 
-            if (closeReply.getResponseType() == ResponseType.CLOSE && closeReply.getData() instanceof Open open) {
-                System.out.println("Closed file \"" + open.path + "\"");
+            if (closeReply.getMessageAction() == MessageAction.CLOSE && closeReply.getData() instanceof Open open) {
+                System.out.printf("Closed file \"%s\".\n", open.path);
             } else {
-                System.out.println("Error: " + closeReply.getData());
+                System.out.printf("Error: %s.\n", closeReply.getData());
                 return true;
             }
 
-            requestQueue.put(new Message<>(RequestType.ADD, open.fileNode));
+            makeRequest(MessageAction.ADD, open.fileNode);
             Message<?> addReply = waitForResponse();
             assert addReply != null;
 
-            if (addReply.getResponseType() == ResponseType.ADD && addReply.getData() instanceof FileNode fileNode) {
-                System.out.printf("Successfully updated fs tree %s\n", fileNode.getPath());
-            } else {
-                System.out.println("Error: " + closeReply.getData());
+            if (addReply.getMessageAction() != MessageAction.ADD || !(addReply.getData() instanceof FileNode)) {
+                throw new Exception(String.valueOf(closeReply.getData()));
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        } catch (Exception e) {
+            System.err.printf("Error: %s.\n", e.getMessage());
         }
 
         return true;

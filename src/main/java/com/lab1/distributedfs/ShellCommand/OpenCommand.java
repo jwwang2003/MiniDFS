@@ -5,8 +5,7 @@ import com.lab1.distributedfs.Helper;
 import com.lab1.distributedfs.IO.Client.Open;
 import com.lab1.distributedfs.IO.Client.OpenMode;
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.Message.MessageAction;
 
 import java.util.List;
 
@@ -27,59 +26,52 @@ public class OpenCommand extends Command {
     @Override
     public boolean handle(List<String> commandArgs) {
         if (commandArgs.isEmpty()) {
-            System.out.println("Error: expected one to two arguments: open <filename> <mode>");
+            System.out.println("Error: open expected one to two arguments.");
             return true;
         }
 
-        if (commandArgs.get(0).equals("help")) {
+        if (commandArgs.getFirst().equals("help")) {
             System.out.println(this.getHelpMessage());
             return true;
         }
 
+        String path = commandArgs.getFirst();
+        String[] pathParts = Helper.getPathParts(path);
+        path = Helper.reconstructPathname(pathParts);
+        OpenMode mode = commandArgs.size() > 1 ? OpenMode.valueOf(commandArgs.get(1).toUpperCase()) : OpenMode.W;
+
         try {
-            String path = commandArgs.getFirst();
-            String[] pathParts = Helper.getPathParts(path);
-            path = Helper.reconstructPathname(pathParts);
+            Open open = new Open(mode, path);
+            Message<?> openReply;
 
-            OpenMode mode = commandArgs.size() > 1 ? OpenMode.valueOf(commandArgs.get(1).toUpperCase()) : OpenMode.W;
-            try {
-                Open open = new Open(mode, path);
-                Message<?> openReply;
+            makeRequest(MessageAction.FIND, path);
+            Message<?> findReply = waitForResponse();
+            assert findReply != null;
 
-                requestQueue.put(new Message<>(RequestType.FIND, path));
-                Message<?> findReply = waitForResponse();
-                assert findReply != null;
-
-                if (findReply.getResponseType() == ResponseType.FOUND && findReply.getData() instanceof FileNode fileNode) {
-                    // File found
-                    open = new Open(mode, path, fileNode);
-                    System.out.println("Found file: " + fileNode.getPath());
-                }
-
-                if (findReply.getResponseType() == ResponseType.NOTFOUND && mode != OpenMode.W) {
-                    System.out.println(findReply.getData());
-                    System.out.printf("File \"%s\" does not exist! Open in write mode to create a new one\n", path);
-                    return true;
-                }
-
-                requestQueue.put(
-                    new Message<>(RequestType.OPEN, open)
-                );
-                openReply = waitForResponse();
-                assert openReply != null;
-
-                if (openReply.getResponseType() == ResponseType.OPEN) {
-                    System.out.println("Opened file \"" + open.fileNode.getPath() + "\"");
-                } else {
-                    System.out.println("Error: " + openReply.getData());
-                }
-            } catch (InterruptedException | AssertionError e) {
-                throw new RuntimeException(e);
+            if (findReply.getMessageAction() == MessageAction.FILE && findReply.getData() instanceof FileNode fileNode) {
+                // File found
+                open = new Open(mode, path, fileNode);
             }
-        } catch (IllegalArgumentException e) {
-            System.out.println("Error: invalid <mode> value: " + e.getMessage());
-        }
 
+            if (findReply.getMessageAction() == MessageAction.FAIL && mode != OpenMode.W) {
+                System.out.println(findReply.getData());
+                System.out.printf("File \"%s\" does not exist! Open in write mode to create a new one.\n", path);
+                return true;
+            }
+
+            makeRequest(MessageAction.OPEN, open);
+            openReply = waitForResponse();
+            assert openReply != null;
+
+            if (openReply.getMessageAction() == MessageAction.OPEN)
+                System.out.printf("Opened file \"%s\".\n", open.fileNode.getPath());
+            else
+                System.out.printf("Error: %s.\n", openReply.getData());
+        } catch (IllegalArgumentException e) {
+            System.out.printf("Error: invalid <mode> value: %s.\n", e.getMessage());
+        } catch (InterruptedException | AssertionError e) {
+            throw new RuntimeException(e);
+        }
     return true;
     }
 }

@@ -8,8 +8,7 @@ import com.lab1.distributedfs.IO.Client.OpenMode;
 import com.lab1.distributedfs.IO.DataNodeIO.ReadRequest;
 import com.lab1.distributedfs.IO.DataNodeIO.ReadResponse;
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.Message.MessageAction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +31,7 @@ public class ReadCommand extends Command {
 
     @Override
     public boolean handle(List<String> commandArgs) {
-        if (!commandArgs.isEmpty() && commandArgs.get(0).equals("help")) {
+        if (!commandArgs.isEmpty() && commandArgs.getFirst().equals("help")) {
             System.out.println(this.getHelpMessage());
             return true;
         }
@@ -45,20 +44,17 @@ public class ReadCommand extends Command {
 
         String path = "";
         try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
-
         String[] pathParts = Helper.getPathParts(path);
         path = Helper.reconstructPathname(pathParts);
 
         try {
             // Request to open the file
-            requestQueue.put(
-                    new Message<>(RequestType.OPEN, new Open(OpenMode.R, path))
-            );
+            makeRequest(MessageAction.OPEN, new Open(OpenMode.R, path));
             Message<?> openReply = waitForResponse();
             assert openReply != null;
 
             // Ensure the file was successfully opened
-            if (openReply.getResponseType() != ResponseType.OPEN) {
+            if (openReply.getMessageAction() != MessageAction.OPEN) {
                 throw new Exception(String.valueOf(openReply.getData()));
             }
             Open open = (Open) openReply.getData();
@@ -70,32 +66,24 @@ public class ReadCommand extends Command {
                 // Send request for the block data to the appropriate data node
                 List<Integer> replicas = blockNode.getReplicas();
                 for (int i = 0; i < replicas.size(); i++) {
-                    requestQueue.put(
-                        new Message<>(RequestType.READ, new ReadRequest(
-                            replicas.get(i),
-                            i,
-                            blockNode.getFilename(),
-                            blockNode.getBlockID()
-                        ))
-                    );
+                    ReadRequest rr = new ReadRequest(replicas.get(i), i, blockNode.getFilename(), blockNode.getBlockID());
+                    makeRequest(MessageAction.READ, rr);
 
                     try {
                         Message<?> readReply = waitForResponse();
                         assert readReply != null;
-                        if (readReply.getResponseType() != ResponseType.READ && !(readReply.getData() instanceof ReadResponse)) {
+                        if (readReply.getMessageAction() != MessageAction.READ && !(readReply.getData() instanceof ReadResponse)) {
                             throw new Exception(String.valueOf(readReply.getData()));
                         }
                         ReadResponse readResponse = (ReadResponse) readReply.getData();
                         rawDataStream.add(readResponse.getBytes());
                         break;
-                    } catch (InterruptedException ignored) {
-
-                    }
+                    } catch (InterruptedException ignored) {}
                 }
             }
 
             // Display the data read from file into the console
-            System.out.printf("Data read from file \"%s\":\n", path);
+            System.out.printf("Data read from file \"%s\" (UTF-8):\n", open.path);
             for (int i = 0; i < rawDataStream.size(); i++) {
                 String stringData = new String(rawDataStream.get(i));
                 System.out.printf("Block %s content: %s\n", i, stringData);
@@ -103,7 +91,7 @@ public class ReadCommand extends Command {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (Exception e) {
-            System.out.println("Error: " + e.getMessage());
+            System.out.printf("Error: %s.\n", e.getMessage());
         }
 
         return true;

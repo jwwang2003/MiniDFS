@@ -5,7 +5,7 @@ package com.lab1.distributedfs.Message;
  * be extra states to handle (for example, FIND operation would have two possible results: FOUND or NOTFOUND).
  * The purpose of having request and response separate is to have this clear separation.
  */
-public enum ResponseType {
+public enum MessageAction {
     // General IO
     OPEN,           // Return OPEN if a file is successfully opened (payload data type should be an Open object)
     CLOSE,          // Return CLOSE if a file is successfully closed (payload data type should be an Open object)
@@ -19,8 +19,8 @@ public enum ResponseType {
 
     // FS tree operations
     // FIND operation usually results in FOUND or NOTFOUND, FAIL is only thrown if there is an internal error
-    NOTFOUND,
-    FOUND,          // If the file is found, then the data attribute will be a FileNode
+    FIND,
+    FILE,          // If the file is found, then the data attribute will be a FileNode
 
     ADD,            // Note that the ADD operation also overwrites the file node if it already exists
                     // This accomplishes the task of "adding" new nodes and updating existing ones (just add it again)
@@ -28,9 +28,11 @@ public enum ResponseType {
                     // Since this just a simple "file" system, we only can manage files, not directories
     LSFS,
 
-    ACK,            // Used as the response for the heartbeat (and maybe other things?)
+    HEARTBEAT,      // Used as the response for the heartbeat (and maybe other things?)
 
     // General
     FAIL,           // Generally used to handle errors and exceptions
     TIMEOUT,
+
+    EXIT
 }

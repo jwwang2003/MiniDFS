@@ -1,10 +1,12 @@
 package com.lab1.distributedfs.ShellCommand;
 
+import com.lab1.distributedfs.FileSystem.BlockNode;
 import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.Helper;
+import com.lab1.distributedfs.IO.DataNodeIO.WriteRequest;
+import com.lab1.distributedfs.IO.DataNodeIO.WriteResponse;
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.Message.MessageAction;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -32,35 +34,44 @@ public class DeleteCommand extends Command{
         }
 
         if (commandArgs.isEmpty()) {
-            System.out.println("Error: delete requires at least one argument");
+            System.out.println("Error: delete requires at least one argument.");
             return true;
         }
 
         String path = "";
         try { path = commandArgs.getFirst(); } catch (NoSuchElementException ignored) {}
-
         String[] pathParts = Helper.getPathParts(path);
         path = Helper.reconstructPathname(pathParts);
 
         try {
-            requestQueue.put(new Message<>(RequestType.DELETE, path));
+            makeRequest(MessageAction.DELETE, path);
             Message<?> deleteReply = waitForResponse();
             assert deleteReply != null;
 
-            if (deleteReply.getResponseType() == ResponseType.DELETE && deleteReply.getData() instanceof FileNode fileNode) {
-                System.out.println("Deleted file node \"" + fileNode.getPath() + "\"");
+            if (deleteReply.getMessageAction() != MessageAction.DELETE)  throw new Exception("delete failed");
 
-                // TODO: Remove the blocks from the DataNode(s)
-            } else {
-                System.out.println("Error: " + deleteReply.getData());
-                return true;
+            FileNode fileNode = (FileNode) deleteReply.getData();
+
+            // Remove the blocks from the DataNode(s)
+            for (BlockNode blockNode: fileNode.getBlockList()) {
+                List<Integer> replicas = blockNode.getReplicas();
+                for (int i = 0; i < replicas.size(); i++) {
+                    WriteRequest wr = new WriteRequest(replicas.get(i), i, fileNode.getPath(), blockNode.getBlockID(), null);
+                    makeRequest(MessageAction.WRITE, wr);
+                    Message<?> blockDeleteReply = waitForResponse();
+                    assert blockDeleteReply != null;
+                    if (blockDeleteReply.getData() instanceof WriteResponse writeResponse) {
+                        if (blockDeleteReply.getMessageAction() != MessageAction.WRITE || writeResponse.getNumBytesWritten() < 0)
+                            throw new Exception("delete block failed");
+                    } else
+                        throw new Exception("delete block failed (invalid response)");
+                }
             }
-
-
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        } catch (Exception e) {
+            System.out.printf("Error: %s.\n", e.getMessage());
         }
-
         return true;
     }
 }

@@ -115,7 +115,6 @@ public class FileSystemTree implements Serializable {
     // ================================================ HELPER =========================================================
 
     private DirectoryNode getSubDirectory(String path, DirectoryNode currentDir) {
-
         String[] dirs = Helper.getPathParts(new File(path).getPath());
 
         // Traverse through the directories in the path

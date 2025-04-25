@@ -5,8 +5,7 @@ import com.lab1.distributedfs.FileSystem.FileNode;
 import com.lab1.distributedfs.FileSystem.FileSystemTree;
 import com.lab1.distributedfs.Message.Message;
 import com.lab1.distributedfs.Message.MessageType;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.Message.MessageAction;
 import com.lab1.distributedfs.Message.MessageBroker;
 
 import java.io.File;
@@ -59,10 +58,6 @@ public class NameNode extends Node {
         this.scheduleDataNodeStatusCheck();
     }
 
-    public int getNodeID() {
-        return nodeID;
-    }
-
     @Override
     public void run() {
         // Subscribe to the message broker and start handling messages
@@ -82,20 +77,20 @@ public class NameNode extends Node {
         switch (message.getMessageType()) {
             case MessageType.Request -> {
                 // Client/user requesting something from the name node
-                switch (message.getRequestType()) {
-                    case RequestType.LSFS -> handleLSFS(message);
-                    case RequestType.FIND -> handleFind(message);
-                    case RequestType.ADD -> handleAdd(message);
-                    case RequestType.DELETE -> handleDelete(message);
-                    case RequestType.STAT -> handleStat(message);
-                    case RequestType.EXIT -> handleExit();
+                switch (message.getMessageAction()) {
+                    case LSFS -> handleLSFS(message);
+                    case FIND -> handleFind(message);
+                    case ADD -> handleAdd(message);
+                    case DELETE -> handleDelete(message);
+                    case STAT -> handleStat(message);
+                    case EXIT -> handleExit();
                 }
             }
             case MessageType.Response -> {
                 // Name node handling a response from a data or client node
-                switch (message.getResponseType()) {
-                    case ResponseType.ACK -> handleHeartbeatACK(message);
-                    case ResponseType.STAT -> handleStatResponse(message);
+                switch (message.getMessageAction()) {
+                    case HEARTBEAT -> handleHeartbeatACK(message);
+                    case STAT -> handleStatResponse(message);
                 }
             }
             default ->
@@ -107,9 +102,7 @@ public class NameNode extends Node {
     // [Requests]
 
     private void handleLSFS(Message<?> message) {
-        this.messageBroker.sendToSubscriber(
-            message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.LSFS, this.fileSystemTree.displayFileSystem())
-        );
+        reply(message, MessageAction.LSFS, this.fileSystemTree.displayFileSystem());
     }
 
     private void handleFind(Message<?> message) {
@@ -117,14 +110,10 @@ public class NameNode extends Node {
         if (message.getData() instanceof String path) {
             try {
                 FileNode fileNode = this.fileSystemTree.getFile(path);
-                this.messageBroker.sendToSubscriber(
-                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.FOUND, fileNode)
-                );
+                reply(message, MessageAction.FILE, fileNode);
             } catch (IllegalArgumentException e) {
-                String errorMessage = String.format("File query \"%s\" failed with %s", path, e.getMessage());
-                this.messageBroker.sendToSubscriber(
-                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
-                );
+                String errorMessage = String.format("file query \"%s\" failed with %s", path, e.getMessage());
+                reply(message, MessageAction.FAIL, errorMessage);
             }
             return;
         }
@@ -134,9 +123,7 @@ public class NameNode extends Node {
     private void handleAdd(Message<?> message) {
         if (message.getData() instanceof FileNode fileNode) {
             this.fileSystemTree.touch(fileNode);
-            this.messageBroker.sendToSubscriber(
-                message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.ADD, fileNode)
-            );
+            reply(message, MessageAction.ADD, fileNode);
             return;
         }
         throw new InvalidParameterException("Invalid command parameters (or data).");
@@ -146,21 +133,17 @@ public class NameNode extends Node {
         if (message.getData() instanceof String path) {
             try {
                 FileNode fileNode = this.fileSystemTree.rm(path);
-                this.messageBroker.sendToSubscriber(
-                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.DELETE, fileNode)
-                );
+                reply(message, MessageAction.DELETE, fileNode);
             } catch (IllegalArgumentException e) {
-                String errorMessage = String.format("file query \"%s\" failed with %s", path, e.getMessage());
-                this.messageBroker.sendToSubscriber(
-                    message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.NOTFOUND, errorMessage)
-                );
+                String errorMessage = String.format("deletion \"%s\" failed with %s", path, e.getMessage());
+                reply(message, MessageAction.FAIL, errorMessage);
             }
         }
     }
 
     private void handleStat(Message<?> message) {
         this.messageBroker.sendToSubscriber(
-            message.getSrcNodeID(), new Message<>(this.getNodeID(), ResponseType.STAT, this.dataNodeStatus)
+            message.getSrcNodeID(), responseMessage(MessageAction.STAT, this.dataNodeStatus)
         );
     }
 
@@ -173,13 +156,11 @@ public class NameNode extends Node {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        if (!this.persist()) {
-            System.out.printf("Error: while terminating NameNode %s", this.nodeID);
-        }
+        this.persist();
         Thread.currentThread().interrupt();
     }
 
-    // [Responses]
+    // Other
 
     private void handleHeartbeatACK(Message<?> message) {
         long currentTime = System.nanoTime();
@@ -187,8 +168,6 @@ public class NameNode extends Node {
 
         if (this.dataNodeStatus.containsKey(senderID)) {
             DataNodeStatus datanodeStatus = this.dataNodeStatus.get(senderID);
-            long diff = currentTime - datanodeStatus.lastSeen;
-            // Update the diff value
             datanodeStatus.lastSeen = currentTime;
             this.dataNodeStatus.replace(senderID, datanodeStatus);
         } else {
@@ -204,14 +183,12 @@ public class NameNode extends Node {
 
     // Other methods
 
-    private boolean persist() {
+    private void persist() {
         try {
             this.fileSystemTree.saveToFile(Const.getPath(Const.FS_IMAGE_FILE));
         } catch (IOException e) {
             System.out.println(e.getMessage());
-            return false;
         }
-        return true;
     }
 
     // Periodic tasks
@@ -220,8 +197,7 @@ public class NameNode extends Node {
         // Periodically broadcast heartbeat request signals
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             // Send heartbeat request to each DataNode's request queue
-            Message<?> heartbeatRequest = new Message<>(this.nodeID, RequestType.HEARTBEAT, null);
-            this.messageBroker.broadcast(heartbeatRequest);
+            broadcast(MessageAction.HEARTBEAT, null);
         }, 0, 50, TimeUnit.MILLISECONDS);
     }
 
@@ -231,10 +207,8 @@ public class NameNode extends Node {
             for (DataNodeStatus status : dataNodeStatus.values()) {
                 // Alive if lastSeen was within timeout
                 status.alive = (now - status.lastSeen) <= Const.WORKER_TIMEOUT;
-                Message<?> statusRequest = new Message<>(this.nodeID, RequestType.STAT, status);
-                this.messageBroker.sendToSubscriber(status.nodeId, statusRequest);
+                send(status.nodeId, MessageAction.STAT, status);
             }
         }, 0, 100, TimeUnit.MILLISECONDS);
     }
-
 }

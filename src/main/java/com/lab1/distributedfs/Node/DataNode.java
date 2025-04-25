@@ -68,10 +68,6 @@ public class DataNode extends Node {
         }
     }
 
-    public int getBlockCount() { return blockCount.get(); }
-
-    public long getStorageUsed() { return storageUsed.get(); }
-
     @Override
     public void run() {
         this.messageBroker.subscribe(this.nodeID, message -> {
@@ -80,10 +76,6 @@ public class DataNode extends Node {
                 this.handleMessage(message);
             }
         });
-    }
-
-    public int getNodeID() {
-        return nodeID;
     }
 
     // ========================================== INTERNAL FUNCTIONS ===================================================
@@ -96,12 +88,12 @@ public class DataNode extends Node {
         }
 
         // Determine the request type
-        switch (message.getRequestType()) {
-            case RequestType.READ -> handleReadRequest(message);
-            case RequestType.WRITE -> handleWriteRequest(message);
-            case RequestType.HEARTBEAT -> handleHeartbeat();
-            case RequestType.STAT -> handleStatusRequest(message);
-            case RequestType.EXIT -> handleExit();
+        switch (message.getMessageAction()) {
+            case READ -> handleReadRequest(message);
+            case WRITE -> handleWriteRequest(message);
+            case HEARTBEAT -> handleHeartbeat();
+            case STAT -> handleStatusRequest(message);
+            case EXIT -> handleExit();
         }
     }
 
@@ -116,7 +108,7 @@ public class DataNode extends Node {
             if (!file.exists()) {
                 // If the file doesn't exist, respond with failure
                 String errorMessage = String.format("Error: file block not found (node%s, %s)", this.nodeID, blockFileName);
-                this.messageBroker.sendToSubscriber(message.getSrcNodeID(), new Message<>(this.nodeID, ResponseType.FAIL, errorMessage));
+                reply(message, MessageAction.FAIL, errorMessage);
                 return;
             }
 
@@ -124,9 +116,7 @@ public class DataNode extends Node {
                 // Read the file data into a byte array
                 byte[] fileData = java.nio.file.Files.readAllBytes(path);
                 // Send the data back via the response queue
-                this.messageBroker.broadcast(
-                    new Message<>(this.nodeID, ResponseType.READ, new ReadResponse(readRequest, fileData))
-                );
+                reply(message, MessageAction.READ, new ReadResponse(readRequest, fileData));
             } catch (IOException e) {
                 String errorMessage = String.format(
                     "Error: while reading file block (node%s, %s): %s%n\n",
@@ -134,24 +124,19 @@ public class DataNode extends Node {
                     readRequest.getPathname(),
                     e.getMessage()
                 );
-                this.messageBroker.broadcast(
-                    new Message<>(this.nodeID, ResponseType.FAIL, errorMessage + Arrays.toString(e.getStackTrace())
-                    )
-                );
+                reply(message, MessageAction.FAIL, errorMessage + Arrays.toString(e.getStackTrace()));
             }
         } else {
             // If the data is not of the expected type, handle it gracefully
             String errorMessage = String.format("Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.messageBroker.broadcast(
-                new Message<>(this.nodeID, ResponseType.FAIL, errorMessage)
-            );
+            reply(message, MessageAction.FAIL, errorMessage);
         }
     }
 
     private void handleWriteRequest(Message<?> message) {
         if (!(message.getData() instanceof WriteRequest writeRequest)) {
             String errorMessage = String.format( "Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.messageBroker.broadcast(new Message<>(this.nodeID, ResponseType.FAIL, errorMessage));
+            reply(message, MessageAction.FAIL, errorMessage);
             return;
         }
 
@@ -159,65 +144,59 @@ public class DataNode extends Node {
         String blockFileName = writeRequest.getFilename();
         Path path = Paths.get(storageDir.getPath(), blockFileName);
         File blockFile = path.toFile();
+        int size = (int) blockFile.length();
 
         // If no data, delete the block file instead of writing
         if (dataBytes == null || dataBytes.length == 0) {
             if (blockFile.exists()) {
                 if (!blockFile.delete()) {
                     String err = String.format("Error: failed to delete block (node%s, %s)", this.nodeID, blockFileName);
-                    this.messageBroker.broadcast(new Message<>(this.nodeID, ResponseType.FAIL, err));
+                    reply(message, MessageAction.FAIL, err);
                     return;
                 }
             }
             // Acknowledge "write" of 0 bytes (i.e. deletion)
-            this.messageBroker.sendToSubscriber(
-                0,
-                new Message<>(this.nodeID, ResponseType.WRITE, new WriteResponse(writeRequest, 0))
-            );
+            this.blockCount.addAndGet(-1);
+            this.storageUsed.addAndGet(-size);
+            reply(message, MessageAction.WRITE, new WriteResponse(writeRequest, (int) blockFile.length()));
             return;
         }
 
         // Otherwise, normal single‐block write logic
-        int totalBlocks = (int) Math.ceil((double) dataBytes.length / Const.BLOCK_SIZE);
+        int totalBlocks = (int) Math.ceil((double) (dataBytes.length + size) / Const.BLOCK_SIZE);
         if (totalBlocks > 1) {
             String err = String.format(
                 "Error: while persisting block (node%s, %s): data exceeds block size",
                 this.nodeID, blockFileName
             );
-            this.messageBroker.broadcast(new Message<>(this.nodeID, ResponseType.FAIL, err));
+            reply(message, MessageAction.FAIL, err);
             return;
         }
 
         try {
             // write (or overwrite) the block file
             this.persistBlock(path, dataBytes);
-            this.messageBroker.broadcast(
-                new Message<>(
-                    this.nodeID,
-                    ResponseType.WRITE,
-                    new WriteResponse(writeRequest, dataBytes.length)
-                )
-            );
-            this.blockCount.addAndGet(1);
+            reply(message, MessageAction.WRITE, new WriteResponse(writeRequest, totalBlocks));
+            if (!writeRequest.isAppendBlock()) {
+                this.blockCount.addAndGet(1);
+            }
             this.storageUsed.addAndGet(dataBytes.length);
         } catch (IOException e) {
             String err = String.format("Error: while persisting block (node%s, %s): %s", this.nodeID, blockFileName, e.getMessage());
-            this.messageBroker.broadcast(
-                new Message<>(this.nodeID, ResponseType.FAIL,err + Arrays.toString(e.getStackTrace()))
-            );
+            reply(message, MessageAction.FAIL, err);
         }
     }
 
     private void handleStatusRequest(Message<?> message) {
         if (!(message.getData() instanceof DataNodeStatus dataNodeStatus)) {
             String errorMessage = String.format( "Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.messageBroker.broadcast(new Message<>(this.nodeID, ResponseType.FAIL, errorMessage));
+            this.messageBroker.sendToSubscriber(message.getSrcNodeID(), responseMessage(MessageAction.FAIL, errorMessage));
             return;
         }
 
         dataNodeStatus.blockCount = this.blockCount.get();
         dataNodeStatus.storageUsed = this.storageUsed.get();
-        this.messageBroker.sendToSubscriber(message.getSrcNodeID(), new Message<>(this.nodeID, ResponseType.STAT, dataNodeStatus));
+        this.messageBroker.sendToSubscriber(message.getSrcNodeID(), responseMessage(MessageAction.STAT, dataNodeStatus));
     }
 
     /**
@@ -250,7 +229,7 @@ public class DataNode extends Node {
      * Sends an ACK response to the response queue, ACKing the heartbeat request from the main thread.
      */
     private void handleHeartbeat() {
-        this.messageBroker.broadcast(new Message<>(this.nodeID, ResponseType.ACK, null));
+        this.messageBroker.broadcast(responseMessage(MessageAction.HEARTBEAT, null));
     }
 
     public void handleExit() {

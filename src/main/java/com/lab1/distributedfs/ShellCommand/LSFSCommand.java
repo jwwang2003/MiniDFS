@@ -1,9 +1,7 @@
 package com.lab1.distributedfs.ShellCommand;
 
-import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
-import com.lab1.distributedfs.Message.ResponseType;
+import com.lab1.distributedfs.Message.MessageAction;
 
 import java.util.List;
 
@@ -16,7 +14,7 @@ public class LSFSCommand extends Command {
     @Override
     public String getHelpMessage() {
         return """
-                    Usage: lsfs
+                Usage: lsfs
                     Dumps the current filesystem tree into the console.""";
     }
 
@@ -29,16 +27,16 @@ public class LSFSCommand extends Command {
         }
 
         try {
-            requestQueue.put(
-                new Message<>(Const.MAIN_NODE_ID, RequestType.LSFS, null)
-            );
+            makeRequest(MessageAction.LSFS, null);
             Message<?> lsReply = waitForResponse();
             assert lsReply != null;
 
-            if (lsReply.getResponseType() == ResponseType.LSFS) {
-                System.out.print(lsReply.getData());
+            if (lsReply.getMessageAction() == MessageAction.LSFS) {
+                System.out.printf(lsReply.getData().toString());
             }
-        } catch (InterruptedException e) { throw new RuntimeException(e); }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         return true;
     }

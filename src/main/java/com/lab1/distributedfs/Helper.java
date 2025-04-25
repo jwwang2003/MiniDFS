@@ -42,23 +42,28 @@ public class Helper {
     }
 
     // Method to read the file and split it into chunks of 4KB (or whatever that is specified int the constants)
-    public static List<byte[]> splitFileIntoChunks(String filePath) throws IOException {
-        List<byte[]> chunks = new ArrayList<>();
+    // Method to read the file into a byte array
+    public static byte[] readFileIntoByteArray(String filePath) throws IOException {
         File file = new File(filePath);
         try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] buffer = new byte[Const.BLOCK_SIZE];
-            int bytesRead;
+            byte[] fileData = new byte[(int) file.length()];
+            fis.read(fileData);
+            return fileData;
+        }
+    }
 
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                if (bytesRead < Const.BLOCK_SIZE) {
-                    // If bytesRead is less than CHUNK_SIZE, resize the buffer to the actual bytes read
-                    byte[] chunk = new byte[bytesRead];
-                    System.arraycopy(buffer, 0, chunk, 0, bytesRead);
-                    chunks.add(chunk);
-                } else {
-                    chunks.add(buffer.clone());
-                }
-            }
+    // Method to split the byte array into chunks
+    public static List<byte[]> splitFileIntoChunks(byte[] fileData) {
+        List<byte[]> chunks = new ArrayList<>();
+        int chunkSize = Const.BLOCK_SIZE;
+        int totalChunks = (int) Math.ceil((double) fileData.length / chunkSize);
+
+        for (int i = 0; i < totalChunks; i++) {
+            int start = i * chunkSize;
+            int end = Math.min(start + chunkSize, fileData.length);
+
+            byte[] chunk = Arrays.copyOfRange(fileData, start, end);
+            chunks.add(chunk);
         }
         return chunks;
     }

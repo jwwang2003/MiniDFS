@@ -2,7 +2,8 @@ package com.lab1.distributedfs.ShellCommand;
 
 import com.lab1.distributedfs.Const;
 import com.lab1.distributedfs.Message.Message;
-import com.lab1.distributedfs.Message.RequestType;
+import com.lab1.distributedfs.Message.MessageAction;
+import com.lab1.distributedfs.Message.MessageType;
 import com.lab1.distributedfs.Node.Client;
 
 import java.util.List;
@@ -25,7 +26,7 @@ public class Command {
     public static void shutdown() {
         System.out.println("Attempting to shutdown...");
         try {
-            requestQueue.put(new Message<>(Const.MAIN_NODE_ID, RequestType.EXIT, null));
+            makeRequest(MessageAction.EXIT, null);
             executorService.shutdown();
             assert executorService.awaitTermination(5, TimeUnit.SECONDS);
             assert executorService.isTerminated();
@@ -34,7 +35,11 @@ public class Command {
         }
     }
 
-    public static Message<?> waitForResponse() {
+    protected static <T> void makeRequest(MessageAction messageAction, T data) throws InterruptedException {
+        requestQueue.put(new Message<>(Const.MAIN_NODE_ID, MessageType.Request, messageAction, data));
+    }
+
+    protected static Message<?> waitForResponse() {
         try {
             return responseQueue.poll(Const.WORKER_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {

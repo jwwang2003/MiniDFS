@@ -30,7 +30,6 @@ public class Client implements Runnable {
 
     // Threading
     private final ExecutorService executorService;
-    private final ConcurrentHashMap<Integer, Node> nodeMap;
     // Communication
     public final MessageBroker messageBroker;
     // Thread-safe hashmap to track "opened files" and also implement a locking mechanism
@@ -45,7 +44,6 @@ public class Client implements Runnable {
         this.responseQueue = responseQueue;
         // Initialize the thread pool
         this.executorService = Executors.newFixedThreadPool(Const.NUM_NODES - 1);
-        this.nodeMap = new ConcurrentHashMap<>();
         // Communication
         this.messageBroker = new MessageBroker(Const.NUM_NODES);
         this.busyPaths = new ConcurrentHashMap<>();
@@ -56,7 +54,6 @@ public class Client implements Runnable {
     public void run() {
         // Initialize the NameNode worker
         NameNode nameNode = new NameNode(messageBroker);
-        nodeMap.put(nameNode.getNodeID(), nameNode);
         executorService.execute(nameNode);
 
         // Initialize the DataNode workers
@@ -69,7 +66,6 @@ public class Client implements Runnable {
                 System.err.println(e.getMessage());
                 throw new RuntimeException(e);
             }
-            nodeMap.put(i, dataNode);
             executorService.execute(dataNode);
         }
 
@@ -80,11 +76,8 @@ public class Client implements Runnable {
         this.messageBroker.subscribe(this.nodeID, message -> {
             // Handle message
             if (message != null && message.getMessageType() == MessageType.Response) {
-                try {
-                    this.handleResponse(message);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                try { this.handleResponse(message); }
+                catch (InterruptedException e) { throw new RuntimeException(e); }
             }
         });
 
@@ -94,75 +87,59 @@ public class Client implements Runnable {
             try {
                 Message<?> message = requestQueue.take();
                 this.handleCommand(message);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
         }
     }
 
-    private void handleResponse(Message<?> response) throws InterruptedException {
+    private void handleResponse(Message<?> message) throws InterruptedException {
         // Handle the responses from the message broker (response)
-        switch (response.getMessageType()) {
-            case Request -> System.out.println("Error: unimplemented action");
-            case Response -> {
-                switch (response.getResponseType()) {
-                    case WRITE, READ, LSFS, FOUND, STAT, NOTFOUND, ADD, DELETE, FAIL -> responseQueue.put(response);
-                }
-            }
+        if (message.getMessageType() != MessageType.Response) return;
+        assert message.getMessageType() == MessageType.Response;
+
+        switch (message.getMessageAction()) {
+            case WRITE, READ, LSFS, FILE, STAT, ADD, DELETE, FAIL -> responseQueue.put(message);
+            case HEARTBEAT -> {}    // So far there are no logic that handles heartbeat responses in the client node
+            default -> sendResponse(MessageAction.FAIL, "unexpected response");
         }
     }
 
     public void handleCommand(Message<?> message) throws InterruptedException {
-        // Handles commands from the main thread (request)
-        switch (message.getMessageType()) {
-            case Request -> {
-                // Remember to override the source node ID
-                message.setSrcNodeID(this.nodeID);
-                switch (message.getRequestType()) {
-                    case LSFS, ADD, STAT ->
-                        // Simply forward the FIND message to the name node
-                        this.messageBroker.sendToSubscriber(
-                            Const.NAME_NODE_ID, message
-                        );
-                    case FIND -> {
-                        // If the path for find operation is empty then use the most recent opened file (if there is)
-                        String path = (String) message.getData();
-                        path = (path.isEmpty() && (this.recentBusyPath != null)) ? this.recentBusyPath.getLast() : path;
-                        if (path.isEmpty()) {
-                            responseQueue.put(new Message<>(ResponseType.FAIL, "path is empty"));
-                            return;
-                        }
-                        if (busyPaths.containsKey(path)) {
-                            responseQueue.put(new Message<>(ResponseType.FOUND, busyPaths.get(path).fileNode));
-                        } else { this.messageBroker.sendToSubscriber(Const.NAME_NODE_ID, message); }
-                    }
-                    case DELETE -> {
-                        // Ensure the file to delete is not busy.
-                        if (busyPaths.containsKey((String) message.getData())) {
-                            responseQueue.put(new Message<>(ResponseType.FAIL, "file is busy"));
-                        } else { this.messageBroker.sendToSubscriber(Const.NAME_NODE_ID, message); }
-                    }
-                    // Handle open & close commands
-                    case OPEN -> this.handleOpenFile(message);
-                    case CLOSE -> this.handleCloseFile(message);
-                    // Data Node commands should be passed directly
-                    case WRITE, READ -> {
-                        if (message.getData() instanceof Block blk) {
-                            this.messageBroker.sendToSubscriber(
-                                blk.getNodeID(), message
-                            );
-                        }
-                    }
-                    // Termination
-                    case EXIT -> this.shutdown();
-                }
-            }
-            case Response -> {
-                switch (message.getResponseType()) {
+        // Handles commands from the main thread (exclusive requests)
+        if (message.getMessageType() != MessageType.Request) return;
+        assert message.getMessageType() == MessageType.Request;
 
+        // Remember to override the source node ID
+        message.setSrcNodeID(this.nodeID);
+        switch (message.getMessageAction()) {
+            // Simply forward the FIND message to the name node
+            case LSFS, ADD, STAT -> this.messageBroker.sendToSubscriber(Const.NAME_NODE_ID, message);
+            case FIND -> {
+                // If the path for find operation is empty then use the most recent opened file (if there is)
+                String path = (String) message.getData();
+                path = (path.isEmpty() && (this.recentBusyPath != null)) ? this.recentBusyPath.getLast() : path;
+                if (path.isEmpty()) {
+                    sendResponse(MessageAction.FAIL, "path is empty");
+                    return;
                 }
+                if (busyPaths.containsKey(path)) {
+                    sendResponse(MessageAction.FILE, busyPaths.get(path).fileNode);
+                } else { this.messageBroker.sendToSubscriber(Const.NAME_NODE_ID, message); }
             }
+            case DELETE -> {
+                // Ensure the file to delete is not busy.
+                if (busyPaths.containsKey((String) message.getData())) {
+                    sendResponse(MessageAction.FAIL, "file is busy");
+                } else { this.messageBroker.sendToSubscriber(Const.NAME_NODE_ID, message); }
+            }
+            // Handle open & close commands
+            case OPEN -> this.handleOpenFile(message);
+            case CLOSE -> this.handleCloseFile(message);
+            // Data Node commands should be passed directly
+            case WRITE, READ -> {
+                if (message.getData() instanceof Block blk) this.messageBroker.sendToSubscriber(blk.getNodeID(), message);
+            }
+            // Termination
+            case EXIT -> this.shutdown();
         }
     }
 
@@ -170,27 +147,25 @@ public class Client implements Runnable {
         if (message.getData() instanceof Open open) {
             if (Helper.getPathParts(open.path).length == 0) {
                 if (this.recentBusyPath.isEmpty()) {
-                    responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "no file opened"));
+                    sendResponse(MessageAction.FAIL, "no file opened");
                     return;
                 }
                 open = busyPaths.get(this.recentBusyPath.getLast());
             } else if (!busyPaths.containsKey(open.path)) {
                 busyPaths.put(open.path, open);
                 recentBusyPath.add(open.path);
-            } else {
-               open = busyPaths.get(open.path);
             }
-
-            responseQueue.put(new Message<>(this.nodeID, ResponseType.OPEN, open));
+            open = busyPaths.get(open.path);
+            sendResponse(MessageAction.OPEN, open);
         }
-        else responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "failed to open file"));
+        else sendResponse(MessageAction.FAIL, "failed to open file");
     }
 
     private void handleCloseFile(Message<?> message) throws InterruptedException {
         String path = (String) message.getData();
 
         if (busyPaths.isEmpty()) {
-            responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "no files opened"));
+            sendResponse(MessageAction.FAIL, "no files opened");
             return;
         }
         try {
@@ -205,13 +180,17 @@ public class Client implements Runnable {
 
             FileNode fileNode = open.fileNode;
             if (fileNode == null) {
-                responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "fileNode is null for file"));
+                sendResponse(MessageAction.FAIL, "fileNode is null for file");
                 return;
             }
-            responseQueue.put(new Message<>(this.nodeID, ResponseType.CLOSE, open));
+            sendResponse(MessageAction.CLOSE, open);
             return;
         } catch (NullPointerException ignored) {}
-        responseQueue.put(new Message<>(this.nodeID, ResponseType.FAIL, "file not found"));
+        sendResponse(MessageAction.FAIL, "file not found");
+    }
+
+    private<T> void sendResponse(MessageAction messageAction, T data) throws InterruptedException {
+        responseQueue.put(new Message<>(this.nodeID, MessageType.Response, messageAction, data));
     }
 
     /**
@@ -223,7 +202,7 @@ public class Client implements Runnable {
      */
     public void shutdown() {
         // Interrupt all worker threads to stop them
-        messageBroker.broadcast(new Message<>(this.nodeID, RequestType.EXIT, null));
+        messageBroker.broadcast(new Message<>(this.nodeID, MessageType.Request, MessageAction.EXIT, null));
         // Shutdown all threads
         executorService.shutdown();
         try {
