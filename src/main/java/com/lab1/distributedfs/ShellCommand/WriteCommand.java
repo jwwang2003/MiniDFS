@@ -117,7 +117,6 @@ public class WriteCommand extends Command {
 
         FileNode fileNode = open.fileNode;
 
-        int startBlockID = 0;
         for (BlockNode blockNode : fileNode.getBlockList()) {
             if (blockNode.getFreeSpace() > 0) {
                 // Found a block is still has space
@@ -126,7 +125,7 @@ public class WriteCommand extends Command {
                 byte[] dataToWrite = Arrays.copyOfRange(dataBytes, 0, bytesToWrite);
 
                 List<Integer> replicas = blockNode.getReplicas();
-                for(int i = 0; i < replicas.size(); i++) {
+                for (int i = 0; i < replicas.size(); i++) {
                     blockNode.expand(dataToWrite.length);
                     WriteRequest writeRequest = new WriteRequest(
                             replicas.get(i),
@@ -145,10 +144,12 @@ public class WriteCommand extends Command {
             }
         }
 
+        int startBlockID = fileNode.getBlockList().size();
         List<byte[]> chunks = Helper.splitDataIntoChunks(dataBytes);
         for (int chunkIdx = 0; chunkIdx < chunks.size(); chunkIdx++) {
             List<Integer> replicas = new ArrayList<>();
             byte[] chunkData = chunks.get(chunkIdx);
+            int blockID = startBlockID + chunkIdx;
             // pick N distinct targets in round-robin fashion
             for (int r = 0; r < Const.REPLICATION_FACTOR; r++) {
                 int nodeIndex     = (chunkIdx + r) % nodeIds.size();
@@ -160,7 +161,7 @@ public class WriteCommand extends Command {
                         /* dataNodeID = */ dataNodeId,
                         /* replica    = */ r,
                         /* pathname   = */ open.path,
-                        /* blockID    = */ startBlockID + chunkIdx,
+                        /* blockID    = */ blockID,
                         /* data       = */ chunkData,
                         /* appendBlock= */ false
                 );
@@ -169,7 +170,7 @@ public class WriteCommand extends Command {
                 Message<?> writeReply = waitForResponse();
                 assert writeReply != null;
             }
-            open.fileNode.getBlockList().add(new BlockNode(chunkIdx, open.path, data.length, replicas));
+            open.fileNode.getBlockList().add(new BlockNode(blockID, open.path, data.length, replicas));
         }
     }
 }
