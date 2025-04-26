@@ -142,9 +142,7 @@ public class NameNode extends Node {
     }
 
     private void handleStat(Message<?> message) {
-        this.messageBroker.sendToSubscriber(
-            message.getSrcNodeID(), responseMessage(MessageAction.STAT, this.dataNodeStatus)
-        );
+        reply(message, MessageAction.STAT, this.dataNodeStatus);
     }
 
     private void handleExit() {

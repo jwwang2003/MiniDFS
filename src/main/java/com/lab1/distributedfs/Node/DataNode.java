@@ -190,13 +190,13 @@ public class DataNode extends Node {
     private void handleStatusRequest(Message<?> message) {
         if (!(message.getData() instanceof DataNodeStatus dataNodeStatus)) {
             String errorMessage = String.format( "Error: unexpected data type: %s", message.getData().getClass().getName());
-            this.messageBroker.sendToSubscriber(message.getSrcNodeID(), responseMessage(MessageAction.FAIL, errorMessage));
+            reply(message, MessageAction.FAIL, errorMessage);
             return;
         }
 
         dataNodeStatus.blockCount = this.blockCount.get();
         dataNodeStatus.storageUsed = this.storageUsed.get();
-        this.messageBroker.sendToSubscriber(message.getSrcNodeID(), responseMessage(MessageAction.STAT, dataNodeStatus));
+        reply(message, MessageAction.STAT, dataNodeStatus);
     }
 
     /**
@@ -229,7 +229,7 @@ public class DataNode extends Node {
      * Sends an ACK response to the response queue, ACKing the heartbeat request from the main thread.
      */
     private void handleHeartbeat() {
-        this.messageBroker.broadcast(responseMessage(MessageAction.HEARTBEAT, null));
+        broadcastReply(MessageAction.HEARTBEAT, null);
     }
 
     public void handleExit() {
